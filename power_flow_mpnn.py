@@ -12,6 +12,8 @@ import torch.nn.functional as F
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
+import random
+
 # Single message-passing layer.
 # Represent one iteration of message passing.
 
@@ -79,6 +81,15 @@ class PowerFlowGNN(nn.Module):
                 data.edge_attr)
         return self.readout(h)
     
+def train_test_split(dataset, train_ratio=0.8):
+    
+    dataset = dataset.copy()
+    random.shuffle(dataset)
+    split = int(train_ratio * len(dataset))
+    train_dataset = dataset[:split]
+    test_dataset = dataset[split:]
+    return train_dataset, test_dataset
+    
 def train_model(
     model,
     dataset,
@@ -112,6 +123,30 @@ def train_model(
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+            
+def test_model(
+    model,
+    dataset,
+    batch_size=32,
+    device='cpu'):
+    
+    model = model.to(device)
+    loader = DataLoader(dataset, batch_size=batch_size)
+    
+    model = eval()
+    total_loss = 0.0
+    
+    with torch.no_grad():
+        
+        for data in loader:
+            
+            data = data.to(device)
+            pred = model(data)
+            loss = F.mse_loss(pred, data.y)
+            total_loss += loss.item()
+            
+    avg_loss = total_loss / len(loader)
+    return avg_loss
             
 if __name__ == '__main__':
 
