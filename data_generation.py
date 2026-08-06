@@ -35,7 +35,7 @@ def perturb_lines(net, r_var=0.1, x_var=0.1):
         len(net.line))
     return net
 
-def build_dataset(net):
+def create_sample(net):
     
     pp.runpp(net)
     
@@ -103,11 +103,41 @@ def build_dataset(net):
         y=y)
 
     return data
+
+def generate_dataset(
+    net,
+    n_samples,
+    vary_loads=True,
+    vary_lines=True,
+    global_scale=(0.7,1.3),
+    local_var=0.1,
+    r_var=0.1,
+    x_var=0.1):
     
+    dataset = []
+    
+    for _ in range(n_samples):
+        
+        net_i = copy.deepcopy(net)
+        
+        if vary_loads:
+            net_i = perturb_loads(
+                net_i,
+                global_scale=np.random.uniform(*global_scale),
+                local_var=local_var)
+        if vary_lines:
+            net_i = perturb_lines(
+                net_i,
+                r_var=r_var,
+                x_var=x_var)
+        dataset.append(create_sample(net_i))
+    return dataset
+
 net = pn.case14() # IEEE 14-bus transmission system
-net2 = perturb_loads(net)
-net3 = perturb_lines(net)
-dataset = build_dataset(net3)
+n_samples = 5
+
+dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
+torch.save(dataset, 'case14.pt')
 
 print('')
 # Generating multiple data points
