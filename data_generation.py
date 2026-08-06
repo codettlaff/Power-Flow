@@ -7,6 +7,7 @@ Created on Thu Aug  6 11:40:39 2026
 
 import copy
 import numpy as np
+from tqdm import tqdm
 
 import torch
 import pandapower as pp
@@ -116,7 +117,7 @@ def generate_dataset(
     
     dataset = []
     
-    for _ in range(n_samples):
+    for _ in tqdm(range(n_samples), desc="Generating samples"):
         
         net_i = copy.deepcopy(net)
         
@@ -134,9 +135,10 @@ def generate_dataset(
     return dataset
 
 net = pn.case14() # IEEE 14-bus transmission system
-n_samples = 5
+n_samples = int(5e3)
 
 dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
+
 torch.save(dataset, 'case14.pt')
 
 print('')
