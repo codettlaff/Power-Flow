@@ -113,5 +113,9 @@ def train_model(
             optimizer.step()
             total_loss += loss.item()
             
-            
+if __name__ == '__main__':
+
+    dataset = torch.load('case14.pt', weights_only=False)
+    model = PowerFlowGNN()
+    train_model(model, dataset)          
         
