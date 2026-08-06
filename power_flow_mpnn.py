@@ -123,6 +123,8 @@ def train_model(
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+    
+    torch.save(model.state_dict(), 'case14_model.pth')
             
 def test_model(
     model,
@@ -151,6 +153,9 @@ def test_model(
 if __name__ == '__main__':
 
     dataset = torch.load('case14.pt', weights_only=False)
+    train_data, test_data = train_test_split(dataset)
+    
     model = PowerFlowGNN()
-    train_model(model, dataset)          
+    train_model(model, train_data) 
+    test_loss = test_model(model, test_data)         
         
