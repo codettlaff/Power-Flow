@@ -23,6 +23,18 @@ def perturb_loads(net, global_scale=1.0, local_var=0.1):
     net.load['q_mvar'] *= scale
     return net
 
+def perturb_lines(net, r_var=0.1, x_var=0.1):
+    net = copy.deepcopy(net)
+    net.line['r_ohm_per_km'] *= np.random.uniform(
+        1-r_var,
+        1+r_var,
+        len(net.line))
+    net.line['x_ohm_per_km'] *= np.random.uniform(
+        1-x_var,
+        1+x_var,
+        len(net.line))
+    return net
+
 def build_dataset(net):
     
     pp.runpp(net)
@@ -94,7 +106,8 @@ def build_dataset(net):
     
 net = pn.case14() # IEEE 14-bus transmission system
 net2 = perturb_loads(net)
-dataset = build_dataset(net2)
+net3 = perturb_lines(net)
+dataset = build_dataset(net3)
 
 print('')
 # Generating multiple data points
