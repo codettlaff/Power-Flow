@@ -1,0 +1,12 @@
+
+Quantity     RMSE           NRMSE     Interpretation
+V            0.0855 pu      102%      Poor
+Theta        1.23 degrees   5.5%      Good
+P            4.28 MW        0.9%      Very Good
+Q            2.42 MVAr      2.1%      Good
+
+Concern: Model that always guesses the average operating point could perform reasonably well.
+Coefficient of determination R^2 = how much better model is than simply predicting the mean.
+-- R^2 = 1 --> Perfect prediction.
+-- R^2 = 0 --> No better than predicting the mean.
+-- R^2 < 0 --> Worse than predicting the mean.

@@ -13,6 +13,7 @@ from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
 import random
+import numpy as np
 
 # Single message-passing layer.
 # Represent one iteration of message passing.
@@ -117,30 +118,61 @@ def train_model(
             total_loss += loss.item()
     
     torch.save(model.state_dict(), save_filepath)
-            
+    
 def test_model(
     model,
-    dataset,
+    test_dataset,
     batch_size=32,
     device='cpu'):
     
     model = model.to(device)
-    loader = DataLoader(dataset, batch_size=batch_size)
-    
+    loader = DataLoader(test_dataset, batch_size=batch_size)
     model.eval()
-    total_loss = 0.0
+    
+    preds = []
+    targets = []
     
     with torch.no_grad():
         
         for data in loader:
-            
             data = data.to(device)
             pred = model(data)
-            loss = F.mse_loss(pred, data.y)
-            total_loss += loss.item()
+            preds.append(pred.cpu())
+            targets.append(data.y.cpu())
             
-    avg_loss = total_loss / len(loader)
-    return avg_loss
+    preds = torch.cat(preds, dim=0)
+    targets = torch.cat(targets, dim=0)
+    
+    preds_np = preds.numpy()
+    targets_np = targets.numpy()
+    
+    metrics = {}
+    var_names = ['V', 'Theta', 'P', 'Q']
+    
+    for i, name in enumerate(var_names):
+        
+        target = targets[:, i]
+        pred = preds[:, i]
+        
+        mse = F.mse_loss(pred, target).item()
+        rmse = np.sqrt(mse)
+        mae = F.l1_loss(pred, target).item()
+        
+        value_range = (target.max() - target.min()).item()
+        nrmse = rmse / value_range if value_range > 0 else np.nan
+        
+        ss_res = torch.sum((target - pred)**2).item()
+        ss_tot = torch.sum((target - target.mean())**2).item()
+        r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else np.nan
+        
+        metrics[name] = {
+            'MSE': mse,
+            'RMSE': rmse,
+            'MAE': mae,
+            'NRMSE': nrmse,
+            'R2': r2}
+        
+    return preds_np, targets_np, metrics
             
 if __name__ == '__main__':
 
