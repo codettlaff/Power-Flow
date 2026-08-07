@@ -10,3 +10,14 @@ Coefficient of determination R^2 = how much better model is than simply predicti
 -- R^2 = 1 --> Perfect prediction.
 -- R^2 = 0 --> No better than predicting the mean.
 -- R^2 < 0 --> Worse than predicting the mean.
+
+Results are good for every variable except V.
+This is likely due to the scale of the loss.
+Model minimizes (V, Theta, P, Q) simultaneously, but quantities have different scales.
+Loss is dominated by errors in P and Q, optimizer has little incentive to reduce voltage error.
+
+Solution: Normalize both inputs are targets before training. 
+Train on per-unit data.
+V already available in per-unit, leave as-is.
+P, Q: Convert to per-unit.
+For Theta, convert to radians.
