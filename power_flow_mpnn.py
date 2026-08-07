@@ -93,6 +93,7 @@ def train_test_split(dataset, train_ratio=0.8):
 def train_model(
     model,
     dataset,
+    save_filepath,
     epochs=100,
     batch_size=32,
     lr=1e-3,
@@ -124,7 +125,7 @@ def train_model(
             optimizer.step()
             total_loss += loss.item()
     
-    torch.save(model.state_dict(), 'case14_model.pth')
+    torch.save(model.state_dict(), save_filepath)
             
 def test_model(
     model,
@@ -135,7 +136,7 @@ def test_model(
     model = model.to(device)
     loader = DataLoader(dataset, batch_size=batch_size)
     
-    model = eval()
+    model.eval()
     total_loss = 0.0
     
     with torch.no_grad():
@@ -156,6 +157,11 @@ if __name__ == '__main__':
     train_data, test_data = train_test_split(dataset)
     
     model = PowerFlowGNN()
-    train_model(model, train_data) 
+    
+    save_filepath = 'case14_model.pth'
+    
+    # train_model(model, train_data, save_filepath) 
+    
+    model.load_state_dict(torch.load(save_filepath, weights_only=True))
     test_loss = test_model(model, test_data)         
         
