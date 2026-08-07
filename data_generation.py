@@ -8,6 +8,7 @@ Created on Thu Aug  6 11:40:39 2026
 import copy
 import numpy as np
 from tqdm import tqdm
+import random
 
 import torch
 import pandapower as pp
@@ -134,12 +135,25 @@ def generate_dataset(
         dataset.append(create_sample(net_i))
     return dataset
 
-net = pn.case14() # IEEE 14-bus transmission system
-n_samples = int(5e3)
+def train_test_split(dataset, train_ratio=0.8):
+    
+    dataset = dataset.copy()
+    random.shuffle(dataset)
+    split = int(train_ratio * len(dataset))
+    train_dataset = dataset[:split]
+    test_dataset = dataset[split:]
+    return train_dataset, test_dataset
 
-dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
+# net = pn.case14() # IEEE 14-bus transmission system
+# n_samples = int(5e3)
+# dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
 
-torch.save(dataset, 'case14.pt')
+dataset = torch.load('case14.pt', weights_only=False)
+
+train_data, test_data = train_test_split(dataset)
+
+torch.save(train_data, 'case14_train.pt')
+torch.save(test_data, 'case14_test.pt')
 
 print('')
 # Generating multiple data points

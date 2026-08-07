@@ -81,15 +81,6 @@ class PowerFlowGNN(nn.Module):
                 data.edge_attr)
         return self.readout(h)
     
-def train_test_split(dataset, train_ratio=0.8):
-    
-    dataset = dataset.copy()
-    random.shuffle(dataset)
-    split = int(train_ratio * len(dataset))
-    train_dataset = dataset[:split]
-    test_dataset = dataset[split:]
-    return train_dataset, test_dataset
-    
 def train_model(
     model,
     dataset,
@@ -153,15 +144,14 @@ def test_model(
             
 if __name__ == '__main__':
 
-    dataset = torch.load('case14.pt', weights_only=False)
-    train_data, test_data = train_test_split(dataset)
+    train_data = torch.load('case14_train.pt', weights_only=False)
+    test_data = torch.load('case14_test.pt', weights_only=False)
     
     model = PowerFlowGNN()
     
     save_filepath = 'case14_model.pth'
     
     # train_model(model, train_data, save_filepath) 
-    
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     test_loss = test_model(model, test_data)         
         
