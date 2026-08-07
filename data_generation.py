@@ -106,6 +106,35 @@ def create_sample(net):
             net.res_bus.q_mvar.values / S_base
         ]),
         dtype=torch.float)
+    
+def generate_dataset(
+    net,
+    n_samples,
+    vary_loads=True,
+    vary_lines=True,
+    global_scale=(0.7,1.3),
+    local_var=0.1,
+    r_var=0.1,
+    x_var=0.1):
+
+    dataset = []
+
+    for _ in tqdm(range(n_samples), desc="Generating samples"):
+
+        net_i = copy.deepcopy(net)
+
+        if vary_loads:
+            net_i = perturb_loads(
+                net_i,
+                global_scale=np.random.uniform(*global_scale),
+                local_var=local_var)
+        if vary_lines:
+            net_i = perturb_lines(
+                net_i,
+                r_var=r_var,
+                x_var=x_var)
+        dataset.append(create_sample(net_i))
+    return dataset
 
 def train_test_split(dataset, train_ratio=0.8):
     
@@ -116,11 +145,11 @@ def train_test_split(dataset, train_ratio=0.8):
     test_dataset = dataset[split:]
     return train_dataset, test_dataset
 
-# net = pn.case14() # IEEE 14-bus transmission system
-# n_samples = int(5e3)
-# dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
+net = pn.case14() # IEEE 14-bus transmission system
+n_samples = int(5e3)
+dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
 
-dataset = torch.load('case14.pt', weights_only=False)
+# dataset = torch.load('case14.pt', weights_only=False)
 
 train_data, test_data = train_test_split(dataset)
 
