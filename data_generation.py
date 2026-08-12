@@ -107,6 +107,12 @@ def create_sample(net):
         ]),
         dtype=torch.float)
     
+    return Data(
+        x=x,
+        edge_index=edge_index,
+        edge_attr=edge_attr,
+        y=y)
+    
 def generate_dataset(
     net,
     n_samples,
@@ -145,11 +151,11 @@ def train_test_split(dataset, train_ratio=0.8):
     test_dataset = dataset[split:]
     return train_dataset, test_dataset
 
-net = pn.case14() # IEEE 14-bus transmission system
-n_samples = int(5e3)
-dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
+# net = pn.case14() # IEEE 14-bus transmission system
+# n_samples = int(5e3)
+# dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
 
-# dataset = torch.load('case14.pt', weights_only=False)
+dataset = torch.load('case14.pt', weights_only=False)
 
 train_data, test_data = train_test_split(dataset)
 

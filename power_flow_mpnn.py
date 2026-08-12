@@ -183,7 +183,7 @@ if __name__ == '__main__':
     
     save_filepath = 'case14_model.pth'
     
-    # train_model(model, train_data, save_filepath) 
+    train_model(model, train_data, save_filepath) 
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     test_loss = test_model(model, test_data)         
         
