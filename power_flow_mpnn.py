@@ -16,6 +16,8 @@ from tqdm import tqdm
 import random
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 # Single message-passing layer.
 # Represent one iteration of message passing.
 
@@ -163,6 +165,17 @@ def test_model(
         'metrics': metrics}
     np.save(results_filepath, results, allow_pickle=True)
     
+def plot_distributions(targets, preds, variable_list):
+    for i, variable in enumerate(variable_list):
+        plt.figure()
+        plt.hist(targets[:, :, i].ravel(), bins=50, alpha=0.5, label='True')
+        plt.hist(preds[:, :, i].ravel(), bins=50, alpha=0.5, label='Predicted')
+        plt.xlabel(variable)
+        plt.ylabel('Frequency')
+        plt.title(f'{variable} Distribution')
+        plt.legend()
+        plt.show()
+    
             
 if __name__ == '__main__':
     
@@ -184,7 +197,12 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    test_model(model, test_data, results_filepath)
-    results = np.load(results_filepath, allow_pickle=True)
+    # test_model(model, test_data, results_filepath)
+    results = np.load(results_filepath, allow_pickle=True).item()
+    
+    plot_distributions(
+    results['targets'],
+    results['preds'],
+    ['V', 'Theta', 'P', 'Q'])
     
     print('')
