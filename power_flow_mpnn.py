@@ -5,6 +5,7 @@ Created on Thu Aug  6 13:49:53 2026
 @author: codett
 """
 
+import os
 import torch
 import torch.nn as nn
 from torch_geometric.nn import MessagePassing
@@ -73,50 +74,41 @@ class PowerFlowGNN(nn.Module):
             nn.ReLU(),
             nn.Linear(64, out_dim))
         
-    def forward(self, data):
-        h = self.encoder(data.x)
+    def forward(self, x, edge_index, edge_attr):
+        h = self.encoder(x)
         for layer in self.layers:
-            h = layer(
-                h,
-                data.edge_index,
-                data.edge_attr)
+            h = layer(h, edge_index, edge_attr)
         return self.readout(h)
     
-def train_model(
-    model,
-    dataset,
-    save_filepath,
-    epochs=100,
-    batch_size=32,
-    lr=1e-3,
-    device='cpu'):
+def train_model(model, dataset, save_filepath, epochs=10, batch_size=32, lr=1e-3, device='cpu'):
     
     model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
-    loader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True)
+    X = torch.tensor(dataset['X'], dtype=torch.float32)
+    Y = torch.tensor(dataset['Y'], dtype=torch.float32)
     
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=lr)
+    edge_index = torch.tensor(dataset['edge_index'])
+    edge_attr = torch.tensor(dataset['edge_attr'], dtype=torch.float32)
     
     for epoch in range(epochs):
-        
         model.train()
-        total_loss = 0.0
+        indices = torch.randperm(len(X))
+        total_loss = 0
         
-        for data in tqdm(loader, desc=f"Epoch {epoch+1}/{epochs}"):
+        for i in tqdm(range(0, len(X), batch_size), desc=f"Epoch {epoch+1}/{epochs}"):
+            idx = indices[i:i+batch_size]
+            x, y = X[idx].to(device), Y[idx].to(device)
+            ea = edge_attr[idx].to(device)
+            ei = edge_index.to(device)
             
-            data = data.to(device)
             optimizer.zero_grad()
-            pred = model(data)
-            loss = F.mse_loss(pred, data.y)
+            pred = model(x, ei, ea)
+            loss = F.mse_loss(pred, y)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-    
+            
     torch.save(model.state_dict(), save_filepath)
     
 def test_model(
@@ -175,15 +167,18 @@ def test_model(
     return preds_np, targets_np, metrics
             
 if __name__ == '__main__':
+    
+    base_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(base_dir, 'data')
+    train_data_filepath = os.path.join(data_dir, 'case14_train.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_test.npy')
 
-    train_data = torch.load('case14_train.pt', weights_only=False)
-    test_data = torch.load('case14_test.pt', weights_only=False)
+    train_data = np.load(train_data_filepath, allow_pickle=True).item()
+    test_data = np.load(test_data_filepath, allow_pickle=True).item()
     
     model = PowerFlowGNN()
-    
     save_filepath = 'case14_model.pth'
     
-    train_model(model, train_data, save_filepath) 
+    train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
-    test_loss = test_model(model, test_data)         
-        
+    test_loss = test_model(model, test_data)
