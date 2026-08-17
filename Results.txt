@@ -1,23 +1,32 @@
 
-Quantity     RMSE           NRMSE     Interpretation
-V            0.0855 pu      102%      Poor
-Theta        1.23 degrees   5.5%      Good
-P            4.28 MW        0.9%      Very Good
-Q            2.42 MVAr      2.1%      Good
+Target Results:
 
-Concern: Model that always guesses the average operating point could perform reasonably well.
-Coefficient of determination R^2 = how much better model is than simply predicting the mean.
--- R^2 = 1 --> Perfect prediction.
--- R^2 = 0 --> No better than predicting the mean.
--- R^2 < 0 --> Worse than predicting the mean.
+Variable     Good RMSE
+V            < 0.01 pu
+Theta        < 0.01 rad
+P            < 0.05 pu
+Q            < 0.05 pu
 
-Results are good for every variable except V.
-This is likely due to the scale of the loss.
-Model minimizes (V, Theta, P, Q) simultaneously, but quantities have different scales.
-Loss is dominated by errors in P and Q, optimizer has little incentive to reduce voltage error.
+For MAE, roughly 50-70% of corresponding RMSE.
 
-Solution: Normalize both inputs are targets before training. 
-Train on per-unit data.
-V already available in per-unit, leave as-is.
-P, Q: Convert to per-unit.
-For Theta, convert to radians.
+Most Recent Results
+
+Variable     RMSE          MAE          NRMSE     R^2          Interpretation
+V            0.0124 pu     0.0107 pu    15.5 %    0.598        Moderate - main weakness
+Theta        0.00868 rad   0.00688 rad  6.4 %     0.961        Very good
+P            0.0424 pu     0.0188 pu    0.94 %    0.996        Excellent
+Q            0.0620 pu     0.0283 pu    0.91 %    0.997        Excellent
+
+Voltage R^2 = 0.60 means model only explains 60 % of the variance.
+RMSE of 0.0124 pu means voltage predictions are off by around 1.2 %.
+
+True voltages occupy a very narrow range.
+This is why we can have a reasonably small voltage error, but only R^2 = 0.60.
+
+Load Permution is only 0.7 - 1.3 scaling. This could be making results look artificially good.
+
+Next Steps:
+1. Improve results visualization.
+1. Increase Load Variation (0.5 - 1.5, 0.3 - 1.7).
+2. Consider Varying Generation as well.
+3. Test on deliberately wider operating range than training data.
