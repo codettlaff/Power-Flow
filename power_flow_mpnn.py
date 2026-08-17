@@ -114,6 +114,7 @@ def train_model(model, dataset, save_filepath, epochs=10, batch_size=32, lr=1e-3
 def test_model(
         model,
         test_dataset,
+        results_filepath,
         batch_size=32,
         device='cpu'):
     
@@ -156,7 +157,12 @@ def test_model(
             'MSE': mse, 'RMSE': rmse, 'MAE': mae,
             'NRMSE': nrmse, 'R2': r2}
         
-    return preds.numpy(), targets.numpy(), metrics
+    results = {
+        'preds': preds.numpy(),
+        'targets': targets.numpy(),
+        'metrics': metrics}
+    np.save(results_filepath, results, allow_pickle=True)
+    
             
 if __name__ == '__main__':
     
@@ -164,6 +170,10 @@ if __name__ == '__main__':
     data_dir = os.path.join(base_dir, 'data')
     train_data_filepath = os.path.join(data_dir, 'case14_train.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test.npy')
+    
+    results_dir = os.path.join(base_dir, 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    results_filepath = os.path.join(results_dir, 'case14_results.npy')
 
     train_data = np.load(train_data_filepath, allow_pickle=True).item()
     test_data = np.load(test_data_filepath, allow_pickle=True).item()
@@ -174,5 +184,7 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    preds, targets, metrics = test_model(model, test_data)
+    test_model(model, test_data, results_filepath)
+    results = np.load(results_filepath, allow_pickle=True)
+    
     print('')
