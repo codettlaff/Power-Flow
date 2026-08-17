@@ -120,16 +120,17 @@ def test_model(
         batch_size=32,
         device='cpu',
         include_knowns=True):
-    
+
     model = model.to(device)
     model.eval()
-    
+
     X = torch.tensor(test_dataset['X'], dtype=torch.float32)
     Y = torch.tensor(test_dataset['Y'], dtype=torch.float32)
     edge_index = torch.tensor(test_dataset['edge_index'], dtype=torch.long)
     edge_attr = torch.tensor(test_dataset['edge_attr'], dtype=torch.float32)
+
     preds, targets = [], []
-    
+
     with torch.no_grad():
         for i in range(0, len(X), batch_size):
             x = X[i:i+batch_size].to(device)
@@ -138,41 +139,47 @@ def test_model(
             pred = model(x, edge_index.to(device), ea)
             preds.append(pred.cpu())
             targets.append(y.cpu())
+
     preds = torch.cat(preds)
     targets = torch.cat(targets)
-    
-    var_names = ['V', 'Theta', 'P', 'V']
-    masks = X[:, :, 4:8] # [mP, mV, mQ, mTheta]
+
+    var_names = np.array(['V', 'Theta', 'P', 'Q'])
+    masks = X[:, :, 4:8]
     metrics = {}
-    
-    if include_knowns: eval_preds, eval_targets = preds, targets
+
+    if include_knowns:
+        eval_preds, eval_targets = preds, targets
     else:
         unknown = masks == 0
-        eval_preds = torch.cat([
-            preds[:, :, i][unknown[:, :, i]] for i in range(4)])
-        eval_targets = torch.cat([
-            targets[:, :, i][unknown[:, :, i]] for i in range(4)])
-        
+        eval_preds, eval_targets = preds.clone(), targets.clone()
+        eval_preds[~unknown] = float('nan')
+        eval_targets[~unknown] = float('nan')
+
     for i, name in enumerate(var_names):
-        target, pred = targets[:, :, i], preds[:, :, i]
+        if include_knowns:
+            pred, target = preds[:, :, i], targets[:, :, i]
+        else:
+            pred = preds[:, :, i][unknown[:, :, i]]
+            target = targets[:, :, i][unknown[:, :, i]]
+
         mse = F.mse_loss(pred, target).item()
         rmse = np.sqrt(mse)
         mae = F.l1_loss(pred, target).item()
-        value_range = (target.max() - target.min()).item()
-        nrmse = rmse / value_range if value_range > 0 else np.nan
         ss_res = torch.sum((target - pred)**2).item()
         ss_tot = torch.sum((target - target.mean())**2).item()
         r2 = 1 - ss_res / ss_tot if ss_tot > 0 else np.nan
-        
-        metrics[name] = {
-            'MSE': mse, 'RMSE': rmse, 'MAE': mae,
-            'NRMSE': nrmse, 'R2': r2}
-        
+
+        metrics[name] = {'MSE': mse, 'RMSE': rmse, 'MAE': mae, 'R2': r2}
+
     results = {
-        'preds': preds.numpy(),
-        'targets': targets.numpy(),
-        'metrics': metrics}
-    np.save(results_filepath, results, allow_pickle=True)  
+        'preds': eval_preds.numpy(),
+        'targets': eval_targets.numpy(),
+        'Y_labels': var_names,
+        'metrics': metrics
+    }
+
+    np.save(results_filepath, results, allow_pickle=True)
+    return results
     
 def plot_distributions(targets, preds, variable_list):
     for i, variable in enumerate(variable_list):
@@ -206,7 +213,7 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    # test_model(model, test_data, results_filepath, include_knowns=False)
+    test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
     plot_distributions(
