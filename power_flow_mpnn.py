@@ -118,7 +118,8 @@ def test_model(
         test_dataset,
         results_filepath,
         batch_size=32,
-        device='cpu'):
+        device='cpu',
+        include_knowns=True):
     
     model = model.to(device)
     model.eval()
@@ -137,13 +138,21 @@ def test_model(
             pred = model(x, edge_index.to(device), ea)
             preds.append(pred.cpu())
             targets.append(y.cpu())
-            
     preds = torch.cat(preds)
     targets = torch.cat(targets)
     
+    var_names = ['V', 'Theta', 'P', 'V']
+    masks = X[:, :, 4:8] # [mP, mV, mQ, mTheta]
     metrics = {}
-    var_names = ['V', 'Theta', 'P', 'Q']
     
+    if include_knowns: eval_preds, eval_targets = preds, targets
+    else:
+        unknown = masks == 0
+        eval_preds = torch.cat([
+            preds[:, :, i][unknown[:, :, i]] for i in range(4)])
+        eval_targets = torch.cat([
+            targets[:, :, i][unknown[:, :, i]] for i in range(4)])
+        
     for i, name in enumerate(var_names):
         target, pred = targets[:, :, i], preds[:, :, i]
         mse = F.mse_loss(pred, target).item()
@@ -163,7 +172,7 @@ def test_model(
         'preds': preds.numpy(),
         'targets': targets.numpy(),
         'metrics': metrics}
-    np.save(results_filepath, results, allow_pickle=True)
+    np.save(results_filepath, results, allow_pickle=True)  
     
 def plot_distributions(targets, preds, variable_list):
     for i, variable in enumerate(variable_list):
@@ -197,7 +206,7 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    # test_model(model, test_data, results_filepath)
+    # test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
     plot_distributions(
