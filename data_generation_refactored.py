@@ -127,6 +127,8 @@ if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    
     train_data_filepath = os.path.join(data_dir, 'case14_train.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test.npy')
     
