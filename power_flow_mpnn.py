@@ -180,6 +180,12 @@ def test_model(
 
     np.save(results_filepath, results, allow_pickle=True)
     return results
+
+def print_metrics(metrics):
+    for name, values in metrics.items():
+        print(f'\n{name}:')
+        for metric, value in values.items():
+            print(f'  {metric}: {value:.6f}')
     
 def plot_distributions(targets, preds, variable_list):
     for i, variable in enumerate(variable_list):
@@ -213,8 +219,10 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    test_model(model, test_data, results_filepath, include_knowns=False)
+    # test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
+    
+    print_metrics(results['metrics'])
     
     plot_distributions(
     results['targets'],
