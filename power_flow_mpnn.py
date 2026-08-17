@@ -112,59 +112,51 @@ def train_model(model, dataset, save_filepath, epochs=10, batch_size=32, lr=1e-3
     torch.save(model.state_dict(), save_filepath)
     
 def test_model(
-    model,
-    test_dataset,
-    batch_size=32,
-    device='cpu'):
+        model,
+        test_dataset,
+        batch_size=32,
+        device='cpu'):
     
     model = model.to(device)
-    loader = DataLoader(test_dataset, batch_size=batch_size)
     model.eval()
     
-    preds = []
-    targets = []
+    X = torch.tensor(test_dataset['X'], dtype=torch.float32)
+    Y = torch.tensor(test_dataset['Y'], dtype=torch.float32)
+    edge_index = torch.tensor(test_dataset['edge_index'], dtype=torch.long)
+    edge_attr = torch.tensor(test_dataset['edge_attr'], dtype=torch.float32)
+    preds, targets = [], []
     
     with torch.no_grad():
-        
-        for data in loader:
-            data = data.to(device)
-            pred = model(data)
+        for i in range(0, len(X), batch_size):
+            x = X[i:i+batch_size].to(device)
+            y = Y[i:i+batch_size].to(device)
+            ea = edge_attr[i:i+batch_size].to(device)
+            pred = model(x, edge_index.to(device), ea)
             preds.append(pred.cpu())
-            targets.append(data.y.cpu())
+            targets.append(y.cpu())
             
-    preds = torch.cat(preds, dim=0)
-    targets = torch.cat(targets, dim=0)
-    
-    preds_np = preds.numpy()
-    targets_np = targets.numpy()
+    preds = torch.cat(preds)
+    targets = torch.cat(targets)
     
     metrics = {}
     var_names = ['V', 'Theta', 'P', 'Q']
     
     for i, name in enumerate(var_names):
-        
-        target = targets[:, i]
-        pred = preds[:, i]
-        
+        target, pred = targets[:, :, i], preds[:, :, i]
         mse = F.mse_loss(pred, target).item()
         rmse = np.sqrt(mse)
         mae = F.l1_loss(pred, target).item()
-        
         value_range = (target.max() - target.min()).item()
         nrmse = rmse / value_range if value_range > 0 else np.nan
-        
         ss_res = torch.sum((target - pred)**2).item()
         ss_tot = torch.sum((target - target.mean())**2).item()
-        r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else np.nan
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else np.nan
         
         metrics[name] = {
-            'MSE': mse,
-            'RMSE': rmse,
-            'MAE': mae,
-            'NRMSE': nrmse,
-            'R2': r2}
+            'MSE': mse, 'RMSE': rmse, 'MAE': mae,
+            'NRMSE': nrmse, 'R2': r2}
         
-    return preds_np, targets_np, metrics
+    return preds.numpy(), targets.numpy(), metrics
             
 if __name__ == '__main__':
     
@@ -179,6 +171,8 @@ if __name__ == '__main__':
     model = PowerFlowGNN()
     save_filepath = 'case14_model.pth'
     
-    train_model(model, train_data, save_filepath)
+    # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
-    test_loss = test_model(model, test_data)
+    
+    preds, targets, metrics = test_model(model, test_data)
+    print('')
