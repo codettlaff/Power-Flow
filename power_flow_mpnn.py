@@ -82,7 +82,51 @@ class PowerFlowGNN(nn.Module):
             h = layer(h, edge_index, edge_attr)
         return self.readout(h)
     
-def train_model(model, dataset, save_filepath, epochs=10, batch_size=32, lr=1e-3, device='cpu'):
+def train_model(
+        model,
+        dataset,
+        save_filepath,
+        epochs=10,
+        batch_size=32,
+        lr=1e-3,
+        device='cpu',
+        loss_weights=[1, 1, 1, 1]):
+    
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    X = torch.tensor(dataset['X'], dtype=torch.float32)
+    Y = torch.tensor(dataset['Y'], dtype=torch.float32)
+    edge_index = torch.tensor(dataset['edge_index'], dtype=torch.long)
+    edge_attr = torch.tensor(dataset['edge_attr'], dtype=torch.float32)
+    
+    masks = X[:, :, 4:8]
+    weights = torch.tensor(loss_weights, dtype=torch.float32)
+    
+    for epoch in range(epochs):
+        model.train()
+        indices = torch.randperm(len(X))
+        
+        for i in tqdm(range(0, len(X), batch_size),
+                       desc=f"Epoch {epoch+1}/{epochs}"):
+            
+            idx = indices[i:i+batch_size]
+            x, y = X[idx].to(device), Y[idx].to(device)
+            mask = masks[idx].to(device)
+            ea = edge_attr[idx].to(device)
+            
+            optimizer.zero_grad()
+            pred = model(x, edge_index.to(device), ea)
+            
+            loss = ((pred - y)**2 * (1 - mask) * weights.to(device)).sum()
+            loss /= ((1 - mask) * weights.to(device)).sum()
+            
+            loss.backward()
+            optimizer.step()
+            
+    torch.save(model.state_dict(), save_filepath)
+    
+def train_model_old(model, dataset, save_filepath, epochs=10, batch_size=32, lr=1e-3, device='cpu'):
     
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -219,7 +263,7 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    # test_model(model, test_data, results_filepath, include_knowns=False)
+    test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
     print_metrics(results['metrics'])
