@@ -30,7 +30,7 @@ def perturb_lines(net, global_scale=1.0, r_var=0.1, x_var=0.1):
         1 - x_var, 1 + x_var, len(net.line))
     return net
 
-def create_sample_new(net):
+def create_sample(net):
     
     pp.runpp(net)
     S_base = net.sn_mva
@@ -64,8 +64,34 @@ def create_sample_new(net):
         X[bus] = [
             p, vm_pu, 0, 0,
             1, 1, 0, 0]
+        
+    # Slack Bus
+    ext = net.ext_grid.iloc[0]
+    X[slack_bus] = [
+        0, ext.vm_pu, 0, np.deg2rad(ext.va_degree),
+        0, 1, 0, 1]
+    
+    # edge_index: defines which buses are connected, shape [2, numer_of_edges].
+    # each column is a connection [from_bus, to_bus]
+    # duplicate / reverse the edges so that graph is treates as undirected.
+    edge_index = np.array([
+        net.line.from_bus.values,
+        net.line.to_bus.values], dtype=np.int64)
+    edge_index = np.concatenate([edge_index, edge_index[::-1]], axis=1)
+    
+    edge_attr = net.line[['r_ohm_per_km', 'x_ohm_per_km']].values.astype(np.float32)
+    edge_attr = np.concatenate([edge_attr, edge_attr], axis=0)
+    
+    # Targets: [V, Theta, P, Q]
+    Y = np.column_stack([
+        net.res_bus.p_mw.values / S_base,
+        net.res_bus.vm_pu.values,
+        net.res_bus.q_mvar.values / S_base,
+        np.deg2rad(net.res_bus.va_degree.values)]).astype(np.float32)
+        
+    return X, Y, edge_index, edge_attr
 
-def create_sample(net):
+def create_sample_old(net):
     pp.runpp(net)
     S_base = net.sn_mva
     n = len(net.bus)
@@ -113,7 +139,7 @@ def create_sample(net):
     edge_attr = net.line[['r_ohm_per_km', 'x_ohm_per_km']].values.astype(np.float32)
     edge_attr = np.concatenate([edge_attr, edge_attr], axis=0)
     
-    # Targets: [V, theta, P, Q]
+    # Targets: [V, Theta, P, Q]
     Y = np.column_stack([
         net.res_bus.p_mw.values / S_base,
         net.res_bus.vm_pu.values,
