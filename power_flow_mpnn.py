@@ -187,7 +187,7 @@ def test_model(
     preds = torch.cat(preds)
     targets = torch.cat(targets)
 
-    var_names = np.array(['V', 'Theta', 'P', 'Q'])
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
     masks = X[:, :, 4:8]
 
     if include_knowns:
@@ -274,7 +274,7 @@ def test_model_old(
     preds = torch.cat(preds)
     targets = torch.cat(targets)
 
-    var_names = np.array(['V', 'Theta', 'P', 'Q'])
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
     masks = X[:, :, 4:8]
     metrics = {}
 
@@ -361,7 +361,7 @@ if __name__ == '__main__':
     model = PowerFlowGNN()
     save_filepath = 'case14_model.pth'
     
-    # train_model(model, train_data, save_filepath)
+    #train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
     test_model(model, test_data, results_filepath, include_knowns=False)
