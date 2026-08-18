@@ -30,6 +30,41 @@ def perturb_lines(net, global_scale=1.0, r_var=0.1, x_var=0.1):
         1 - x_var, 1 + x_var, len(net.line))
     return net
 
+def create_sample_new(net):
+    
+    pp.runpp(net)
+    S_base = net.sn_mva
+    n = len(net.bus)
+    
+    # Want one slack bus
+    n_ext = len(net.ext_grid) # number of external grid connections.
+    slack_bus = int(net.ext_grid.iloc[0].bus)
+    
+    pv_buses = set(net.gen.bus.astype(int))
+    pq_buses = set(range(n)) - pv_buses - {slack_bus}
+    
+    # Node features: [P, V, Q, Theta, mP, mV, mQ, mTheta]
+    X = np.zeros((n, 8), dtype=np.float32)
+    
+    # PQ Buses
+    # Include both load buses and zero-injection buses.
+    for idx in pq_buses:
+        p = net.load.loc[net.load.bus == idx, 'p_mw'].sum() / S_base
+        q = net.load.loc[net.load.bus == idx, 'q_mvar'].sum() / S_base
+        X[idx] = [
+            p, 0, q, 0,
+            1, 0, 1, 0]
+        
+    # PV Buses
+    # Generator buses are treated as PV even if they also have a load.
+    for bus in pv_buses:
+        gens = net.gen[net.gen.bus == bus]
+        p = gens.p_mw.sum() / S_base
+        vm_pu = gens.vm_pu.iloc[0] # All generators at a bus should have the same voltage setpoint.
+        X[bus] = [
+            p, vm_pu, 0, 0,
+            1, 1, 0, 0]
+
 def create_sample(net):
     pp.runpp(net)
     S_base = net.sn_mva
