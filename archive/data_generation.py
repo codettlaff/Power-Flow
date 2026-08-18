@@ -151,9 +151,9 @@ def train_test_split(dataset, train_ratio=0.8):
     test_dataset = dataset[split:]
     return train_dataset, test_dataset
 
-# net = pn.case14() # IEEE 14-bus transmission system
-# n_samples = int(5e3)
-# dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
+net = pn.case14() # IEEE 14-bus transmission system
+n_samples = int(5e3)
+dataset = generate_dataset(net, n_samples) # Returns list of PyTorch Geometric Data Objects
 
 dataset = torch.load('case14.pt', weights_only=False)
 
@@ -163,6 +163,3 @@ torch.save(train_data, 'case14_train.pt')
 torch.save(test_data, 'case14_test.pt')
 
 print('')
-# Generating multiple data points
-# Randomly scale the loads while keeping network topology fixed.
-# Want 5,000-10,000 samples for case 14.
