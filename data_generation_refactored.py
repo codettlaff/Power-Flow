@@ -80,11 +80,11 @@ def create_sample(net):
     
     # Targets: [V, theta, P, Q]
     Y = np.column_stack([
-        net.res_bus.vm_pu.values,
-        np.deg2rad(net.res_bus.va_degree.values),
         net.res_bus.p_mw.values / S_base,
-        net.res_bus.q_mvar.values / S_base]).astype(np.float32)
-    
+        net.res_bus.vm_pu.values,
+        net.res_bus.q_mvar.values / S_base,
+        np.deg2rad(net.res_bus.va_degree.values)].astype(np.float32))
+        
     return X, Y, edge_index, edge_attr
 
 def generate_dataset(
@@ -107,7 +107,7 @@ def generate_dataset(
         'X': np.array(X),
         'Y': np.array(Y),
         'X_labels': np.array(['P', 'V', 'Q', 'theta', 'mP', 'mV', 'mQ', 'mTheta']),
-        'Y_labels': np.array(['V', 'theta', 'P', 'Q']),
+        'Y_labels': np.array(['P', 'V', 'Q', 'theta']),
         'edge_index': create_sample(net)[2],
         'edge_attr': np.array(edge_attrs)}
 
