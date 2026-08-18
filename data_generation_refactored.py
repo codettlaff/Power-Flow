@@ -83,7 +83,7 @@ def create_sample(net):
         net.res_bus.p_mw.values / S_base,
         net.res_bus.vm_pu.values,
         net.res_bus.q_mvar.values / S_base,
-        np.deg2rad(net.res_bus.va_degree.values)].astype(np.float32))
+        np.deg2rad(net.res_bus.va_degree.values)]).astype(np.float32)
         
     return X, Y, edge_index, edge_attr
 
@@ -132,7 +132,8 @@ if __name__ == '__main__':
     train_data_filepath = os.path.join(data_dir, 'case14_train.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test.npy')
     
-    n_samples = int(5e3)
+    # n_samples = int(5e3)
+    n_samples = 10
     
     net = pn.case14()
     dataset = generate_dataset(net, n_samples)
