@@ -206,8 +206,8 @@ def test_model(
         if include_knowns:
             pred, target = preds[:, :, i], targets[:, :, i]
         else:
-            pred = preds[:, :, i][unknown[:, :, i]]
-            target = targets[:, :, i][unknown[:, :, i]]
+            pred = eval_preds[:, :, i][unknown[:, :, i]]
+            target = eval_targets[:, :, i][unknown[:, :, i]]
 
         mse = F.mse_loss(pred, target).item()
         rmse = np.sqrt(mse)
@@ -364,7 +364,7 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    # test_model(model, test_data, results_filepath, include_knowns=False)
+    test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
     print_metrics(results['metrics'])
@@ -374,6 +374,6 @@ if __name__ == '__main__':
     plot_distributions(
     results['targets'],
     results['preds'],
-    ['V', 'Theta', 'P', 'Q'])
+    ['P', 'V', 'Q', 'Theta'])
     
     print('')
