@@ -328,6 +328,20 @@ def plot_distributions(targets, preds, variable_list):
         plt.title(f'{variable} Distribution')
         plt.legend()
         plt.show()
+        
+def plot_bus_metrics(bus_metrics, metrics_labels):
+    plt.figure()
+    buses = np.arange(1, len(bus_metrics) + 1)
+
+    for i, label in enumerate(metrics_labels):
+        plt.plot(buses, bus_metrics[:, i], marker='o', label=label)
+
+    plt.xlabel('Bus Number')
+    plt.ylabel('RMSE (pu)')
+    plt.xticks(buses)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
     
             
 if __name__ == '__main__':
@@ -354,6 +368,8 @@ if __name__ == '__main__':
     results = np.load(results_filepath, allow_pickle=True).item()
     
     print_metrics(results['metrics'])
+    
+    plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
     
     plot_distributions(
     results['targets'],
