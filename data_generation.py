@@ -96,7 +96,7 @@ def generate_dataset(
         net_i = copy.deepcopy(net)
         
         if vary_loads: net_i = perturb_loads(net_i, np.random.uniform(*global_scale), local_var)
-        if vary_lines: net_i = perturb_lines(net_i, r_var, x_var)
+        if vary_lines: net_i = perturb_lines(net_i, np.random.uniform(*global_scale), r_var, x_var)
         
         x, y, _, edge_attr = create_sample(net_i)
         X.append(x)
