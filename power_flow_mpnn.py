@@ -238,7 +238,7 @@ def test_model(
         'metrics': metrics,
         'bus_metrics': bus_metrics,
         'metrics_labels': np.array([
-            'V_RMSE', 'Theta_RMSE', 'P_RMSE', 'Q_RMSE'])
+            'P_RMSE', 'V_RMSE', 'Q_RMSE', 'Theta_RMSE'])
     }
 
     np.save(results_filepath, results, allow_pickle=True)
@@ -361,10 +361,10 @@ if __name__ == '__main__':
     model = PowerFlowGNN()
     save_filepath = 'case14_model.pth'
     
-    #train_model(model, train_data, save_filepath)
+    # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    test_model(model, test_data, results_filepath, include_knowns=False)
+    # test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
     print_metrics(results['metrics'])
