@@ -132,8 +132,7 @@ if __name__ == '__main__':
     train_data_filepath = os.path.join(data_dir, 'case14_train.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test.npy')
     
-    # n_samples = int(5e3)
-    n_samples = 10
+    n_samples = int(5e3)
     
     net = pn.case14()
     dataset = generate_dataset(net, n_samples)
