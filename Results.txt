@@ -12,28 +12,50 @@ For MAE, roughly 50-70% of corresponding RMSE.
 Most Recent Results
 
 P:
-  MSE: 0.023363
-  RMSE: 0.152851
-  MAE: 0.086720
-  R2: 0.984282
+  MSE: 0.020152
+  RMSE: 0.141958
+  MAE: 0.083439
+  R2: 0.986442
+  Mean Bias: 0.073126
+  Regression Slope: 0.937764
+  
+Strong results for power.
+Slope below 1 indicates some compression of P range.
+Still has +0.073 pu bias.
 
 V:
-  MSE: 0.000066
-  RMSE: 0.008122
-  MAE: 0.007014
-  R2: 0.777999
+  MSE: 0.000028
+  RMSE: 0.005289
+  MAE: 0.004277
+  R2: 0.905879
+  Mean Bias: 0.002290
+  Regression Slope: 1.003615
+  
+Very strong results for voltage.
+Regression slope approximately 1.0, model is not significatly compressing the voltage range.
 
 Q:
-  MSE: 0.002262
-  RMSE: 0.047556
-  MAE: 0.034244
-  R2: 0.926765
+  MSE: 0.001954
+  RMSE: 0.044208
+  MAE: 0.031794
+  R2: 0.936712
+  Mean Bias: 0.015007
+  Regression Slope: 0.889508
+  
+Moderately strong results for Q.
+Model somewhat compresses the Q range.
+Moderate positive bias.
 
 Theta:
-  MSE: 0.001652
-  RMSE: 0.040642
-  MAE: 0.031476
-  R2: 0.732039
+  MSE: 0.002029
+  RMSE: 0.045047
+  MAE: 0.036799
+  R2: 0.670817
+  Mean Bias: 0.025812
+  Regression Slope: 0.784603
+  
+Weakest result.
+Significant compression.
   
 Model frequently produces a narrow spike near center of true distribution peak.
 We are training with MSE: L = \frac{1}{N} \sum_i (\hat{y}_i - y_i)^2
@@ -73,3 +95,8 @@ Add predicted-vs-true scatter plot with identity line y = x.
 True versus Prediction Scatterplot Results
 Main issue is regression towards the center of the distribution.
 At upper end, predictions get closer to the true values.
+
+Common causes of prediction compression:
+1. Training distribution lacks extreme cases. Solution: deliberately oversample tails.
+2. MSE encourages conditional-mean predictions. Solutions: Weighted MSE, Huber Loss.
+3. Dataset imbalance - most training examples occupy relatively narrow region of operating space.
