@@ -404,35 +404,25 @@ def plot_scatterplots(targets, preds, variable_list, bus_list):
             plt.tight_layout()
             plt.show()
     
-def plot_scatterplots_old(targets, preds, variable_list, bus_list):
-    var_indices = {'P': 0, 'V': 1, 'Q': 2, 'Theta': 3}
-
+def plot_pred_vs_true(targets, preds, variable_list, bus_list):
+    var_indices = {'P':0, 'V':1, 'Q':2, 'Theta':3}
     for bus in bus_list:
         for variable in variable_list:
             i = var_indices[variable]
-
             true = targets[:, bus-1, i]
             pred = preds[:, bus-1, i]
-
             mask = ~np.isnan(true) & ~np.isnan(pred)
-            if not np.any(mask):
-                continue
-
-            x = np.arange(len(true))[mask]
+            if not np.any(mask): continue
             true, pred = true[mask], pred[mask]
-
-            true_fit = np.poly1d(np.polyfit(x, true, 1))(x)
-            pred_fit = np.poly1d(np.polyfit(x, pred, 1))(x)
-
-            plt.figure()
-            plt.scatter(x, true, alpha=0.4, label='True')
-            plt.scatter(x, pred, alpha=0.4, label='Predicted')
-            plt.plot(x, true_fit, '--', label='True best fit')
-            plt.plot(x, pred_fit, '-', label='Predicted best fit')
-            plt.xlabel('Sample Index')
-            plt.ylabel(f'{variable} (pu)')
+            lims = [min(true.min(), pred.min()), max(true.max(), pred.max())]
+            plt.figure(figsize=(6, 6))
+            plt.scatter(true, pred, s=15, alpha=0.25)
+            plt.plot(lims, lims, 'k--', linewidth=2, label='Identity')
+            plt.xlabel('True (pu)')
+            plt.ylabel('Predicted (pu)')
             plt.title(f'{variable} — Bus {bus}')
             plt.legend()
+            plt.tight_layout()
             plt.show()
             
 if __name__ == '__main__':
@@ -464,6 +454,8 @@ if __name__ == '__main__':
     
     # plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'],bus=3)
     
-    plot_scatterplots(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
+    # plot_scatterplots(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
+    
+    plot_pred_vs_true(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
     
     print('')
