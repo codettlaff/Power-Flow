@@ -69,3 +69,7 @@ Systematic positive prediction bias.
 
 Potential solution: Add mean signed error (bias) to error metrics.
 Add predicted-vs-true scatter plot with identity line y = x.
+
+True versus Prediction Scatterplot Results
+Main issue is regression towards the center of the distribution.
+At upper end, predictions get closer to the true values.
