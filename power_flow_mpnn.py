@@ -164,6 +164,107 @@ def test_model(
         batch_size=32,
         device='cpu',
         include_knowns=True):
+    
+    model = model.to(device)
+    model.eval()
+
+    X = torch.tensor(test_dataset['X'], dtype=torch.float32)
+    Y = torch.tensor(test_dataset['Y'], dtype=torch.float32)
+    edge_index = torch.tensor(test_dataset['edge_index'], dtype=torch.long)
+    edge_attr = torch.tensor(test_dataset['edge_attr'], dtype=torch.float32)
+
+    preds, targets = [], []
+    
+    with torch.no_grad():
+        for i in range(0, len(X), batch_size):
+            x = X[i:i+batch_size].to(device)
+            y = Y[i:i+batch_size].to(device)
+            ea = edge_attr[i:i+batch_size].to(device)
+            pred = model(x, edge_index.to(device), ea)
+            preds.append(pred.cpu())
+            targets.append(y.cpu())
+            
+    preds = torch.cat(preds)
+    targets = torch.cat(targets)
+
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
+    masks = X[:, :, 4:8]
+    
+    if include_knowns:
+        eval_preds, eval_targets = preds, targets
+        unknown = torch.ones_like(masks, dtype=torch.bool)
+    else:
+        unknown = masks == 0
+        eval_preds, eval_targets = preds.clone(), targets.clone()
+        eval_preds[~unknown] = float('nan')
+        eval_targets[~unknown] = float('nan')
+        
+    metrics = {}
+    bus_metrics = np.full((Y.shape[1], 4), np.nan)
+    
+    for i, name in enumerate(var_names):
+        if include_knowns:
+            pred, target = preds[:, :, i], targets[:, :, i]
+        else:
+            pred = eval_preds[:, :, i][unknown[:, :, i]]
+            target = eval_targets[:, :, i][unknown[:, :, i]]
+
+        mse = F.mse_loss(pred, target).item()
+        rmse = np.sqrt(mse)
+        mae = F.l1_loss(pred, target).item()
+
+        ss_res = torch.sum((target - pred)**2).item()
+        ss_tot = torch.sum((target - target.mean())**2).item()
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else np.nan
+
+        bias = torch.mean(pred - target).item()
+
+        slope = np.polyfit(
+            target.numpy(),
+            pred.numpy(),
+            1
+        )[0]
+
+        metrics[name] = {
+            'MSE': mse,
+            'RMSE': rmse,
+            'MAE': mae,
+            'R2': r2,
+            'Mean Bias': bias,
+            'Regression Slope': slope
+        }
+
+        for bus in range(Y.shape[1]):
+            mask = unknown[:, bus, i]
+            if mask.any():
+                bus_metrics[bus, i] = torch.sqrt(
+                    F.mse_loss(
+                        preds[:, bus, i][mask],
+                        targets[:, bus, i][mask]
+                    )
+                ).item()
+
+    results = {
+        'preds': eval_preds.numpy(),
+        'targets': eval_targets.numpy(),
+        'Y_labels': var_names,
+        'metrics': metrics,
+        'bus_metrics': bus_metrics,
+        'metrics_labels': np.array([
+            'P_RMSE', 'V_RMSE', 'Q_RMSE', 'Theta_RMSE'
+        ])
+    }
+
+    np.save(results_filepath, results, allow_pickle=True)
+    return results
+    
+def test_model_old(
+        model,
+        test_dataset,
+        results_filepath,
+        batch_size=32,
+        device='cpu',
+        include_knowns=True):
 
     model = model.to(device)
     model.eval()
@@ -377,10 +478,10 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     # model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    # test_model(model, test_data, results_filepath, include_knowns=False)
+    test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
-    # print_metrics(results['metrics'])
+    print_metrics(results['metrics'])
     
     # plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
     
