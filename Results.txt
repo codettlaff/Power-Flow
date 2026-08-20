@@ -143,3 +143,56 @@ Theta:
   Regression Slope: 0.624735
   
 Worse RMSE and worse regression slope. Mean bias flipped to negative.
+
+========== Global Scale Range (0.4,1.6) ==========
+
+P:
+  MSE: 0.039871
+  RMSE: 0.199678
+  MAE: 0.160714
+  R2: 0.960369
+  Mean Bias: -0.129171
+  Regression Slope: 0.988983
+  
+RMSE slightly increase from 0.142 to 0.200.
+Regression slope improved from 0.938 to 0.989.
+Mean bias went from 0.073126 to -0.129171. Slight worsening.
+
+V:
+  MSE: 0.000099
+  RMSE: 0.009960
+  MAE: 0.007565
+  R2: 0.793713
+  Mean Bias: -0.001963
+  Regression Slope: 0.787516
+  
+Slightly worse RMSE (0.0053 to 0.01). Worse slope (1.004 to 0.788).
+Slightly less bias (bias was already very small).
+
+Q:
+  MSE: 0.003939
+  RMSE: 0.062759
+  MAE: 0.047698
+  R2: 0.945268
+  Mean Bias: -0.001043
+  Regression Slope: 1.008108
+  
+Slightly worse RMSE (0.044 to 0.063). Slightly worse slope (0.785 to 0.729)
+Slightly better bias (bias already not that bad).
+  
+RMSE slightly increased from 0.044 to 0.063.
+Regression slope improved from 0.890 to 1.008.
+Mean bias virtually dissapeared.
+
+Theta:
+  MSE: 0.005645
+  RMSE: 0.075131
+  MAE: 0.052283
+  R2: 0.679052
+  Mean Bias: -0.011398
+  Regression Slope: 0.729476
+  
+Increasing the operating range does not solve the compression problem.
+The model can learn a broad P relationship and a borad Q relationship.
+Theta remains compressed even with broader training data.
+V becomes less accurate with broader training data.
