@@ -317,8 +317,32 @@ def print_metrics(metrics):
         print(f'\n{name}:')
         for metric, value in values.items():
             print(f'  {metric}: {value:.6f}')
+            
+def plot_distributions(targets, preds, variable_list, bus=None):
+    for i, variable in enumerate(variable_list):
+        if bus is None:
+            true = targets[:, :, i].ravel()
+            pred = preds[:, :, i].ravel()
+        else:
+            true = targets[:, bus-1, i]
+            pred = preds[:, bus-1, i]
+
+        if np.all(np.isnan(true)) or np.all(np.isnan(pred)):
+            continue
+
+        plt.figure()
+        plt.hist(true, bins=50, alpha=0.5, label='True')
+        plt.hist(pred, bins=50, alpha=0.5, label='Predicted')
+        plt.xlabel(variable)
+        plt.ylabel('Frequency')
+        plt.title(
+            f'{variable} Distribution' +
+            (f' — Bus {bus}' if bus is not None else '')
+        )
+        plt.legend()
+        plt.show()
     
-def plot_distributions(targets, preds, variable_list):
+def plot_distributions_old(targets, preds, variable_list, bus=None):
     for i, variable in enumerate(variable_list):
         plt.figure()
         plt.hist(targets[:, :, i].ravel(), bins=50, alpha=0.5, label='True')
@@ -343,6 +367,73 @@ def plot_bus_metrics(bus_metrics, metrics_labels):
     plt.grid(True, alpha=0.3)
     plt.show()
     
+def plot_scatterplots(targets, preds, variable_list, bus_list):
+    var_indices = {'P': 0, 'V': 1, 'Q': 2, 'Theta': 3}
+
+    for bus in bus_list:
+        for variable in variable_list:
+            i = var_indices[variable]
+
+            true = targets[:, bus-1, i]
+            pred = preds[:, bus-1, i]
+
+            mask = ~np.isnan(true) & ~np.isnan(pred)
+            if not np.any(mask):
+                continue
+
+            x = np.arange(len(true))[mask]
+            true, pred = true[mask], pred[mask]
+
+            true_coeff = np.polyfit(x, true, 1)
+            pred_coeff = np.polyfit(x, pred, 1)
+
+            x_fit = np.linspace(x.min(), x.max(), 200)
+            true_fit = np.polyval(true_coeff, x_fit)
+            pred_fit = np.polyval(pred_coeff, x_fit)
+
+            plt.figure(figsize=(8, 5))
+            plt.scatter(x, true, s=15, alpha=0.25, label='True')
+            plt.scatter(x, pred, s=15, alpha=0.25, label='Predicted')
+            plt.plot(x_fit, true_fit, '--', linewidth=2.5, label='True best fit')
+            plt.plot(x_fit, pred_fit, '-', linewidth=2.5, label='Predicted best fit')
+
+            plt.xlabel('Sample Index')
+            plt.ylabel(f'{variable} (pu)')
+            plt.title(f'{variable} — Bus {bus}')
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+    
+def plot_scatterplots_old(targets, preds, variable_list, bus_list):
+    var_indices = {'P': 0, 'V': 1, 'Q': 2, 'Theta': 3}
+
+    for bus in bus_list:
+        for variable in variable_list:
+            i = var_indices[variable]
+
+            true = targets[:, bus-1, i]
+            pred = preds[:, bus-1, i]
+
+            mask = ~np.isnan(true) & ~np.isnan(pred)
+            if not np.any(mask):
+                continue
+
+            x = np.arange(len(true))[mask]
+            true, pred = true[mask], pred[mask]
+
+            true_fit = np.poly1d(np.polyfit(x, true, 1))(x)
+            pred_fit = np.poly1d(np.polyfit(x, pred, 1))(x)
+
+            plt.figure()
+            plt.scatter(x, true, alpha=0.4, label='True')
+            plt.scatter(x, pred, alpha=0.4, label='Predicted')
+            plt.plot(x, true_fit, '--', label='True best fit')
+            plt.plot(x, pred_fit, '-', label='Predicted best fit')
+            plt.xlabel('Sample Index')
+            plt.ylabel(f'{variable} (pu)')
+            plt.title(f'{variable} — Bus {bus}')
+            plt.legend()
+            plt.show()
             
 if __name__ == '__main__':
     
@@ -362,18 +453,17 @@ if __name__ == '__main__':
     save_filepath = 'case14_model.pth'
     
     # train_model(model, train_data, save_filepath)
-    model.load_state_dict(torch.load(save_filepath, weights_only=True))
+    # model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    test_model(model, test_data, results_filepath, include_knowns=False)
+    # test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
-    print_metrics(results['metrics'])
+    # print_metrics(results['metrics'])
     
-    plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
+    # plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
     
-    plot_distributions(
-    results['targets'],
-    results['preds'],
-    ['P', 'V', 'Q', 'Theta'])
+    # plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'],bus=3)
+    
+    plot_scatterplots(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
     
     print('')
