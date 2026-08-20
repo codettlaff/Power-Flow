@@ -49,3 +49,16 @@ Reveals:
 -- regression to the mean
 -- bias
 -- outliers
+
+Individual Bus Histogram Results
+Model tends to capture the central region of each distribution while compressing the tails.
+In several cases shifts the prediction towards less extreme value.
+
+Bus 1 P - most concerning, shows bias to the right.
+Bus 1 Q - mostly good, underpredicts extreme reactive-power conditions.
+bus 2 Q - shows bias to the right, shows variance compression.
+bus 2 Theta - pronounced bias to the right, under-represents negative tail.
+bus 3 Q - only very slight rightward bias, predicted and true distributions mostly overlap.
+bus 3 Theta - slight rightward bias, slight variance compression.
+
+Model lacks precision in the less-common operating points.
