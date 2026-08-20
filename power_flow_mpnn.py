@@ -384,6 +384,43 @@ def plot_scatterplots(targets, preds, variable_list, bus_list):
             x = np.arange(len(true))[mask]
             true, pred = true[mask], pred[mask]
 
+            true_coeff = np.polyfit(x, true, 1)
+            pred_coeff = np.polyfit(x, pred, 1)
+
+            x_fit = np.linspace(x.min(), x.max(), 200)
+            true_fit = np.polyval(true_coeff, x_fit)
+            pred_fit = np.polyval(pred_coeff, x_fit)
+
+            plt.figure(figsize=(8, 5))
+            plt.scatter(x, true, s=15, alpha=0.25, label='True')
+            plt.scatter(x, pred, s=15, alpha=0.25, label='Predicted')
+            plt.plot(x_fit, true_fit, '--', linewidth=2.5, label='True best fit')
+            plt.plot(x_fit, pred_fit, '-', linewidth=2.5, label='Predicted best fit')
+
+            plt.xlabel('Sample Index')
+            plt.ylabel(f'{variable} (pu)')
+            plt.title(f'{variable} — Bus {bus}')
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+    
+def plot_scatterplots_old(targets, preds, variable_list, bus_list):
+    var_indices = {'P': 0, 'V': 1, 'Q': 2, 'Theta': 3}
+
+    for bus in bus_list:
+        for variable in variable_list:
+            i = var_indices[variable]
+
+            true = targets[:, bus-1, i]
+            pred = preds[:, bus-1, i]
+
+            mask = ~np.isnan(true) & ~np.isnan(pred)
+            if not np.any(mask):
+                continue
+
+            x = np.arange(len(true))[mask]
+            true, pred = true[mask], pred[mask]
+
             true_fit = np.poly1d(np.polyfit(x, true, 1))(x)
             pred_fit = np.poly1d(np.polyfit(x, pred, 1))(x)
 
