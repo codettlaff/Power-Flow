@@ -186,7 +186,7 @@ if __name__ == '__main__':
     scale_range = (0.1, 2)
     
     net = pn.case14()
-    dataset = generate_dataset(net, n_samples)
+    dataset = generate_dataset(net, n_samples, scale_range=scale_range)
     train_data, test_data = train_test_split(dataset)
     
     np.save(train_data_filepath, train_data, allow_pickle=True)
