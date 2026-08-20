@@ -14,6 +14,18 @@ import random
 import pandapower as pp
 import pandapower.networks as pn
 
+def sample_scale(distribution='uniform', scale_range=(0.7, 1.3)):
+    if distribution == 'uniform':
+        return np.random.uniform(*scale_range)
+    elif distribution == 'laplace':
+        center = np.mean(scale_range)
+        spread = (scale_range[1] - scale_range[0]) / 2
+        return center + np.random.laplace(0, spread / 2)
+    elif distribution == 'extreme': # Favor lower and upper ends of the range
+        center = np.mean(scale_range)
+        spread = (scale_range[1] - scale_range[0]) / 2
+        return center + spread * np.random.choice([-1,1]) * np.random.uniform(0.5,1.0)
+
 def perturb_loads(net, global_scale=1.0, local_var=0.1):
     net = copy.deepcopy(net)
     scale = global_scale * np.random.uniform(
@@ -91,64 +103,41 @@ def create_sample(net):
         
     return X, Y, edge_index, edge_attr
 
-def create_sample_old(net):
-    pp.runpp(net)
-    S_base = net.sn_mva
-    n = len(net.bus)
-    
-    # Node features: [P, V, Q, theta, mP, mV, mQ, mTheta]
-    X = np.zeros((n, 8), dtype=np.float32)
-    
-    # PQ Buses
-    for idx in net.load.bus:
-        p = net.load.loc[net.load.bus == idx, 'p_mw'].sum() / S_base
-        q = net.load.loc[net.load.bus == idx, 'q_mvar'].sum() / S_base
-        X[idx] = [
-            p,
-            0,
-            q,
-            0, 
-            1, 0, 1, 0]
-        
-    # PV Buses
-    for _, gen in net.gen.iterrows():
-        X[int(gen.bus)] = [
-            gen.p_mw / S_base,
-            gen.vm_pu,
-            0,
-            0,
-            1, 1, 0, 0]
-        
-    # Slack Bus
-    for _, ext in net.ext_grid.iterrows():
-        X[int(ext.bus)] = [
-            0,
-            ext.vm_pu,
-            0,
-            np.deg2rad(ext.va_degree),
-            0, 1, 0, 1]
-        
-    # edge_index: defines which buses are connected, shape [2, numer_of_edges].
-    # each column is a connection [from_bus, to_bus]
-    # duplicate / reverse the edges so that graph is treates as undirected.
-    edge_index = np.array([
-        net.line.from_bus.values,
-        net.line.to_bus.values], dtype=np.int64)
-    edge_index = np.concatenate([edge_index, edge_index[::-1]], axis=1)
-    
-    edge_attr = net.line[['r_ohm_per_km', 'x_ohm_per_km']].values.astype(np.float32)
-    edge_attr = np.concatenate([edge_attr, edge_attr], axis=0)
-    
-    # Targets: [V, Theta, P, Q]
-    Y = np.column_stack([
-        net.res_bus.p_mw.values / S_base,
-        net.res_bus.vm_pu.values,
-        net.res_bus.q_mvar.values / S_base,
-        np.deg2rad(net.res_bus.va_degree.values)]).astype(np.float32)
-        
-    return X, Y, edge_index, edge_attr
-
 def generate_dataset(
+        net, n_samples, vary_loads=True, vary_lines=True,
+        distribution='uniform', scale_range=(0.7, 1.3),
+        local_var=0.1, r_var=0.1, x_var=0.1):
+
+    X, Y, edge_attrs = [], [], []
+
+    for _ in tqdm(range(n_samples), desc='Generating samples'):
+        net_i = copy.deepcopy(net)
+
+        if vary_loads:
+            net_i = perturb_loads(
+                net_i, sample_scale(distribution, scale_range), local_var)
+
+        if vary_lines:
+            net_i = perturb_lines(
+                net_i, sample_scale(distribution, scale_range),
+                r_var, x_var)
+
+        x, y, _, edge_attr = create_sample(net_i)
+        X.append(x)
+        Y.append(y)
+        edge_attrs.append(edge_attr)
+
+    return {
+        'X': np.array(X),
+        'Y': np.array(Y),
+        'X_labels': np.array(
+            ['P', 'V', 'Q', 'theta', 'mP', 'mV', 'mQ', 'mTheta']),
+        'Y_labels': np.array(['P', 'V', 'Q', 'theta']),
+        'edge_index': create_sample(net)[2],
+        'edge_attr': np.array(edge_attrs)
+    }
+
+def generate_dataset_old(
         net, n_samples, vary_loads=True, vary_lines=True,
         global_scale=(0.7, 1.3), local_var=0.1, r_var=0.1, x_var=0.1):
     
@@ -190,10 +179,11 @@ if __name__ == '__main__':
     data_dir = os.path.join(base_dir, 'data')
     os.makedirs(data_dir, exist_ok=True)
     
-    train_data_filepath = os.path.join(data_dir, 'case14_train.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_test.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_train2.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_test2.npy')
     
     n_samples = int(5e3)
+    scale_range = (0.1, 2)
     
     net = pn.case14()
     dataset = generate_dataset(net, n_samples)
