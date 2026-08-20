@@ -361,19 +361,16 @@ if __name__ == '__main__':
     model = PowerFlowGNN()
     save_filepath = 'case14_model.pth'
     
-    # train_model(model, train_data, save_filepath)
+    train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
     test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
-    print_metrics(results['metrics'])
+    # print_metrics(results['metrics'])
     
-    plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
+    # plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
     
-    plot_distributions(
-    results['targets'],
-    results['preds'],
-    ['P', 'V', 'Q', 'Theta'])
+    # plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'])
     
     print('')
