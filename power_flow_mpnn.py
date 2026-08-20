@@ -462,8 +462,8 @@ if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, 'data')
-    train_data_filepath = os.path.join(data_dir, 'case14_train.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_test.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_train2.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_test2.npy')
     
     results_dir = os.path.join(base_dir, 'results')
     os.makedirs(results_dir, exist_ok=True)
@@ -475,8 +475,8 @@ if __name__ == '__main__':
     model = PowerFlowGNN()
     save_filepath = 'case14_model.pth'
     
-    # train_model(model, train_data, save_filepath)
-    # model.load_state_dict(torch.load(save_filepath, weights_only=True))
+    train_model(model, train_data, save_filepath)
+    model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
     test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
@@ -489,6 +489,6 @@ if __name__ == '__main__':
     
     # plot_scatterplots(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
     
-    plot_pred_vs_true(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
+    # plot_pred_vs_true(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
     
     print('')
