@@ -100,3 +100,46 @@ Common causes of prediction compression:
 1. Training distribution lacks extreme cases. Solution: deliberately oversample tails.
 2. MSE encourages conditional-mean predictions. Solutions: Weighted MSE, Huber Loss.
 3. Dataset imbalance - most training examples occupy relatively narrow region of operating space.
+
+========== Global Scale Range from (0.7,1.3) to (0.1,2.0) ==========
+
+P:
+  MSE: 0.043900
+  RMSE: 0.209524
+  MAE: 0.159489
+  R2: 0.984429
+  Mean Bias: -0.112198
+  Regression Slope: 1.006407
+  
+Slightly better regression slope, but significantly worse RMSE.
+Mean bias also worse, and negative rather than positive.
+
+V:
+  MSE: 0.000424
+  RMSE: 0.020602
+  MAE: 0.015445
+  R2: 0.604020
+  Mean Bias: -0.004844
+  Regression Slope: 0.887032
+  
+RMSE and regression slope become worse. Mean bias flipped to negative.
+
+Q:
+  MSE: 0.012388
+  RMSE: 0.111300
+  MAE: 0.082532
+  R2: 0.955983
+  Mean Bias: -0.036692
+  Regression Slope: 0.937051
+  
+Better regression slope, worse RMSE. Mean bias flipped to negative.
+
+Theta:
+  MSE: 0.020232
+  RMSE: 0.142239
+  MAE: 0.098477
+  R2: 0.606383
+  Mean Bias: -0.028824
+  Regression Slope: 0.624735
+  
+Worse RMSE and worse regression slope. Mean bias flipped to negative.
