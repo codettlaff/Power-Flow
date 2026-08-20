@@ -367,6 +367,36 @@ def plot_bus_metrics(bus_metrics, metrics_labels):
     plt.grid(True, alpha=0.3)
     plt.show()
     
+def plot_scatterplots(targets, preds, variable_list, bus_list):
+    var_indices = {'P': 0, 'V': 1, 'Q': 2, 'Theta': 3}
+
+    for bus in bus_list:
+        for variable in variable_list:
+            i = var_indices[variable]
+
+            true = targets[:, bus-1, i]
+            pred = preds[:, bus-1, i]
+
+            mask = ~np.isnan(true) & ~np.isnan(pred)
+            if not np.any(mask):
+                continue
+
+            x = np.arange(len(true))[mask]
+            true, pred = true[mask], pred[mask]
+
+            true_fit = np.poly1d(np.polyfit(x, true, 1))(x)
+            pred_fit = np.poly1d(np.polyfit(x, pred, 1))(x)
+
+            plt.figure()
+            plt.scatter(x, true, alpha=0.4, label='True')
+            plt.scatter(x, pred, alpha=0.4, label='Predicted')
+            plt.plot(x, true_fit, '--', label='True best fit')
+            plt.plot(x, pred_fit, '-', label='Predicted best fit')
+            plt.xlabel('Sample Index')
+            plt.ylabel(f'{variable} (pu)')
+            plt.title(f'{variable} — Bus {bus}')
+            plt.legend()
+            plt.show()
             
 if __name__ == '__main__':
     
@@ -391,10 +421,12 @@ if __name__ == '__main__':
     # test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
-    print_metrics(results['metrics'])
+    # print_metrics(results['metrics'])
     
-    plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
+    # plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
     
-    plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'],bus=1)
+    # plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'],bus=3)
+    
+    plot_scatterplots(results['targets'], results['preds'], ['Q', 'Theta'], [2,3])
     
     print('')
