@@ -62,3 +62,10 @@ bus 3 Q - only very slight rightward bias, predicted and true distributions most
 bus 3 Theta - slight rightward bias, slight variance compression.
 
 Model lacks precision in the less-common operating points.
+
+Scatterplot Results:
+Prediction Best-Fit line is consistently above prediction best-fit line.
+Systematic positive prediction bias.
+
+Potential solution: Add mean signed error (bias) to error metrics.
+Add predicted-vs-true scatter plot with identity line y = x.
