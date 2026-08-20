@@ -462,8 +462,8 @@ if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, 'data')
-    train_data_filepath = os.path.join(data_dir, 'case14_train2.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_test2.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_train3.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_test3.npy')
     
     results_dir = os.path.join(base_dir, 'results')
     os.makedirs(results_dir, exist_ok=True)
