@@ -317,8 +317,32 @@ def print_metrics(metrics):
         print(f'\n{name}:')
         for metric, value in values.items():
             print(f'  {metric}: {value:.6f}')
+            
+def plot_distributions(targets, preds, variable_list, bus=None):
+    for i, variable in enumerate(variable_list):
+        if bus is None:
+            true = targets[:, :, i].ravel()
+            pred = preds[:, :, i].ravel()
+        else:
+            true = targets[:, bus-1, i]
+            pred = preds[:, bus-1, i]
+
+        if np.all(np.isnan(true)) or np.all(np.isnan(pred)):
+            continue
+
+        plt.figure()
+        plt.hist(true, bins=50, alpha=0.5, label='True')
+        plt.hist(pred, bins=50, alpha=0.5, label='Predicted')
+        plt.xlabel(variable)
+        plt.ylabel('Frequency')
+        plt.title(
+            f'{variable} Distribution' +
+            (f' — Bus {bus}' if bus is not None else '')
+        )
+        plt.legend()
+        plt.show()
     
-def plot_distributions(targets, preds, variable_list):
+def plot_distributions_old(targets, preds, variable_list, bus=None):
     for i, variable in enumerate(variable_list):
         plt.figure()
         plt.hist(targets[:, :, i].ravel(), bins=50, alpha=0.5, label='True')
@@ -361,16 +385,16 @@ if __name__ == '__main__':
     model = PowerFlowGNN()
     save_filepath = 'case14_model.pth'
     
-    train_model(model, train_data, save_filepath)
-    model.load_state_dict(torch.load(save_filepath, weights_only=True))
+    # train_model(model, train_data, save_filepath)
+    # model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    test_model(model, test_data, results_filepath, include_knowns=False)
+    # test_model(model, test_data, results_filepath, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
-    # print_metrics(results['metrics'])
+    print_metrics(results['metrics'])
     
-    # plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
+    plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
     
-    # plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'])
+    plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'],bus=1)
     
     print('')
