@@ -9,7 +9,7 @@ Q            < 0.05 pu
 
 For MAE, roughly 50-70% of corresponding RMSE.
 
-Most Recent Results
+Most Recent Results (0.7 -> 1.3)
 
 P:
   MSE: 0.020152
@@ -203,3 +203,21 @@ Still need to figure out why larger operating range is causing more negative bia
 Is there a way we can train in stages?
 First training on a more narrow operating range, focusing on getting good results and low RMSE, even if that means having some compression.
 Then training on more extreme examples, trying to eliminate compression and bias without decreasing the RMSE.
+
+===== Table =====
+Operating Range          Variable          RMSE          R^2          Mean Bias          Regression Slope
+
+===== My Results versus PowerFlowNet =====
+
+Architectural Differences - PowerFlowNet:
+-- Combines message-passing layer with TAGConv
+-- Mask encoder
+
+Quantity          PowerFlowNet Case14 Results (mean absolute error p.u.)      My Current Results (RMSE p.u.)
+V                 0.0011                                                      0.00529 
+Theta             0.20 degree                                                 0.045 rad = 2.58 degree
+P                 0.04                                                        0.142
+Q                 0.03                                                        0.044
+
+Before I go to implement TagConv, it seems that most other papers use multi-layer MPNN, which is probably simpler.
+It seems like the point of TagConv was to avoid needing mulitple MPNN layers.
