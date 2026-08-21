@@ -219,5 +219,5 @@ Theta             0.20 degree                                                 0.
 P                 0.04                                                        0.142
 Q                 0.03                                                        0.044
 
-Before I go to implement TagConv, it seems that most other papers use multi-layer MPNN, which is probably simpler.
-It seems like the point of TagConv was to avoid needing mulitple MPNN layers.
+We already have multi-hop (5-layer model), want to test whether increasing MPNN depth improves angle prediction.
+May also want to support dropout and optional layer normalization.
