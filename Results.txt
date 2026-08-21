@@ -196,3 +196,10 @@ Increasing the operating range does not solve the compression problem.
 The model can learn a broad P relationship and a borad Q relationship.
 Theta remains compressed even with broader training data.
 V becomes less accurate with broader training data.
+
+Try adding weighted MSE that gives greater weight to samples with larger aboslute errors.
+Still need to figure out why larger operating range is causing more negative bias.
+
+Is there a way we can train in stages?
+First training on a more narrow operating range, focusing on getting good results and low RMSE, even if that means having some compression.
+Then training on more extreme examples, trying to eliminate compression and bias without decreasing the RMSE.
