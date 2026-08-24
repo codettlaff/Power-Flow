@@ -179,11 +179,11 @@ if __name__ == '__main__':
     data_dir = os.path.join(base_dir, 'data')
     os.makedirs(data_dir, exist_ok=True)
     
-    train_data_filepath = os.path.join(data_dir, 'case14_train2.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_test2.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
     
     n_samples = int(5e3)
-    scale_range = (0.4, 1.6)
+    scale_range = (0.7, 1.3)
     
     net = pn.case14()
     dataset = generate_dataset(net, n_samples, scale_range=scale_range)
