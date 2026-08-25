@@ -144,3 +144,31 @@ def train_test_split(dataset, train_ratio=0.8):
     test = {k: v[indices[split:]] if k in ['X', 'Y', 'edge_attr'] else v for k, v in dataset.items()}
     
     return train, test
+
+if __name__ == '__main__':
+    
+    base_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(base_dir, 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    
+    train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
+    
+    n_samples = int(5e4)
+    load_scale_factor = (0.7, 1.3)
+    gen_power_scale_factor = (0.7, 1.3)
+    gen_voltage_scale_factor = (0.98, 1.02)
+    
+    net = pn.case14()
+    dataset = create_dataset(
+        net,
+        n_samples,
+        perturb_loads=True,
+        load_scale_factor=load_scale_factor,
+        perturb_generator_powers=True,
+        gen_powers_scale_factor=gen_power_scale_factor,
+        perturb_generator_voltages=True,
+        gen_voltages_scale_factor=gen_voltage_scale_factor)
+        
+    train_data, test_data = train_test_split(dataset)
+        
