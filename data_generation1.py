@@ -140,8 +140,8 @@ def train_test_split(dataset, train_ratio=0.8):
     random.shuffle(indices)
     split = int(train_ratio * n)
     
-    train = {k: v[indices[:split]] if k in ['X', 'Y', 'edge_attr'] else v for k, v in dataset.items()}
-    test = {k: v[indices[split:]] if k in ['X', 'Y', 'edge_attr'] else v for k, v in dataset.items()}
+    train = {k: v[indices[:split]] if k in ['X', 'Y'] else v for k, v in dataset.items()}
+    test = {k: v[indices[split:]] if k in ['X', 'Y'] else v for k, v in dataset.items()}
     
     return train, test
 
@@ -154,7 +154,8 @@ if __name__ == '__main__':
     train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
     
-    n_samples = int(5e4)
+    # n_samples = int(5e4)
+    n_samples = 100 # Test
     load_scale_factor = (0.7, 1.3)
     gen_power_scale_factor = (0.7, 1.3)
     gen_voltage_scale_factor = (0.98, 1.02)
@@ -171,4 +172,7 @@ if __name__ == '__main__':
         gen_voltages_scale_factor=gen_voltage_scale_factor)
         
     train_data, test_data = train_test_split(dataset)
+    
+    np.save(train_data_filepath, train_data, allow_pickle=True)
+    np.save(test_data_filepath, test_data, allow_pickle=True)
         
