@@ -118,7 +118,10 @@ def get_system_bases(net):
     S_base = float(net.sn_mva)
     V_base = net.bus.vn_kv.values.astype(np.float32)
     z_base = (V_base[net.line.from_bus.values] ** 2 / S_base).astype(np.float32)
-    return S_base, V_base, z_base
+    return {
+        'S_base': S_base,
+        'V_base': V_base,
+        'z_base': z_base}
 
 def scale_loads(net, scale_factor):
     s = np.random.uniform(*scale_factor, len(net.load))
@@ -144,64 +147,156 @@ def get_edge_data(net):
 
     return edge_index, edge_attr
 
+# Absolute Values, not per-unit
 def create_sample(
         net,
         perturb_loads=False,
-        load_scale_factor=(0.7,1.3),
+        load_scale_factor=(0.7, 1.3),
         perturb_generator_powers=True,
-        gen_powers_scale_factor=(0.7,1.3),
+        gen_powers_scale_factor=(0.7, 1.3),
         perturb_generator_voltages=True,
-        gen_voltages_scale_factor=(0.98,1.02)):
-    
+        gen_voltages_scale_factor=(0.98, 1.02)):
+
     net = copy.deepcopy(net)
-    S_base = net.sn_mva
-    
-    if perturb_loads: scale_loads(net, load_scale_factor)
-    if perturb_generator_powers: scale_generator_powers(net, gen_powers_scale_factor)
-    if perturb_generator_voltages: scale_generator_voltages(net, gen_voltages_scale_factor)
-    
+
+    if perturb_loads:
+        scale_loads(net, load_scale_factor)
+    if perturb_generator_powers:
+        scale_generator_powers(net, gen_powers_scale_factor)
+    if perturb_generator_voltages:
+        scale_generator_voltages(net, gen_voltages_scale_factor)
+
     pp.runpp(net, numba=False)
-    
+
     n = len(net.bus)
     X = np.zeros((n, 8), dtype=np.float32)
-    
+
     slack = int(net.ext_grid.iloc[0].bus)
     pv = set(net.gen.bus.astype(int))
     pq = set(range(n)) - pv - {slack}
-    
-    # PQ buses, including zero-injection buses
+
+    # PQ buses
     for bus in pq:
         load = net.load[net.load.bus == bus]
-        P = load.p_mw.sum() / S_base
-        Q = load.q_mvar.sum() / S_base
+        P = load.p_mw.sum()
+        Q = load.q_mvar.sum()
+
         X[bus] = [P, 0, Q, 0, 1, 0, 1, 0]
-        
+
     # PV buses
     for bus in pv:
         gen = net.gen[net.gen.bus == bus]
+        V_kv = gen.vm_pu.iloc[0] * net.bus.vn_kv.iloc[bus]
+
         X[bus] = [
-            gen.p_mw.sum() / S_base,
-            gen.vm_pu.iloc[0],
-            0, 0,
-            1, 1, 0, 0]
-        
-    # Slack Bus
+            gen.p_mw.sum(),
+            V_kv,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0
+        ]
+
+    # Slack bus
     ext = net.ext_grid.iloc[0]
+    V_kv = ext.vm_pu * net.bus.vn_kv.iloc[slack]
+
     X[slack] = [
-        0, ext.vm_pu, 0, np.deg2rad(ext.va_degree),
-        0, 1, 0, 1]
-    
-    edge_index, edge_attr = get_edge_data(net)
-    
+        0,
+        V_kv,
+        0,
+        np.deg2rad(ext.va_degree),
+        0,
+        1,
+        0,
+        1
+    ]
+
+    # Absolute-value outputs
     Y = np.column_stack([
-        net.res_bus.p_mw.values / S_base,
-        net.res_bus.vm_pu.values,
-        net.res_bus.q_mvar.values / S_base,
-        np.deg2rad(net.res_bus.va_degree.values)]).astype(np.float32)
-    
+        net.res_bus.p_mw.values,
+        net.res_bus.vm_pu.values * net.bus.vn_kv.values,
+        net.res_bus.q_mvar.values,
+        np.deg2rad(net.res_bus.va_degree.values)
+    ]).astype(np.float32)
+
     return X, Y
 
+def convert_to_per_unit(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+    Z_base = V_base**2 / S_base
+
+    data = data.copy()
+    data[..., 0] /= S_base  # P
+    data[..., 1] /= V_base  # V
+    data[..., 2] /= S_base  # Q
+    # data[..., 3] = Theta unchanged
+
+    return data
+
+
+def convert_to_absolute(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+
+    data = data.copy()
+    data[..., 0] *= S_base  # P
+    data[..., 1] *= V_base  # V
+    data[..., 2] *= S_base  # Q
+    # data[..., 3] = Theta unchanged
+
+    return data
+
 def create_dataset(
+        net,
+        n_samples,
+        per_unit=True,
+        perturb_loads=True,
+        load_scale_factor=(0.7, 1.3),
+        perturb_generator_powers=True,
+        gen_powers_scale_factor=(0.7, 1.3),
+        perturb_generator_voltages=True,
+        gen_voltages_scale_factor=(0.98, 1.02)):
+
+    edge_index, edge_attr = get_edge_data(net)
+    bases = get_system_bases(net)
+    X, Y = [], []
+
+    for _ in tqdm(range(n_samples), desc='Generating samples'):
+        x, y = create_sample(
+            net,
+            perturb_loads,
+            load_scale_factor,
+            perturb_generator_powers,
+            gen_powers_scale_factor,
+            perturb_generator_voltages,
+            gen_voltages_scale_factor)
+
+        X.append(x)
+        Y.append(y)
+
+    X = np.array(X)
+    Y = np.array(Y)
+
+    if per_unit:
+        X = convert_to_per_unit(X, bases)
+        Y = convert_to_per_unit(Y, bases)
+
+    return {
+        'X': X,
+        'Y': Y,
+        'X_labels': np.array(['P', 'V', 'Q', 'Theta', 'mP', 'mV', 'mQ', 'mTheta']),
+        'Y_labels': np.array(['P', 'V', 'Q', 'Theta']),
+        'edge_index': edge_index,
+        'edge_attr': edge_attr,
+        'per_unit': per_unit,
+        'bases': bases
+    }
+
+def create_dataset_old(
         net,
         n_samples,
         perturb_loads=True,
@@ -212,6 +307,7 @@ def create_dataset(
         gen_voltages_scale_factor=(0.98,1.02)):
     
     edge_index, edge_attr = get_edge_data(net)
+    bases = get_system_bases(net)
     X, Y = [], []
     
     for _ in tqdm(range(n_samples), desc='Generating samples'):
@@ -255,13 +351,13 @@ if __name__ == '__main__':
     train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
     
-    n_samples = int(5e5) # 50,000 samples
-    # n_samples = 100 # Test
+    # n_samples = int(5e5) # 50,000 samples
+    n_samples = 100 # Test
     load_scale_factor = (0.8, 1.2)
     gen_power_scale_factor = (0.8, 1.2)
     gen_voltage_scale_factor = (0.99, 1.01)
     
-    get_max_load_net = True # Done
+    get_max_load_net = False # Done
     
     net = pn.case14() 
     # inspect_net(net)
@@ -273,6 +369,7 @@ if __name__ == '__main__':
     dataset = create_dataset(
         max_load_net,
         n_samples,
+        per_unit=False,
         perturb_loads=True,
         load_scale_factor=load_scale_factor,
         perturb_generator_powers=True,
