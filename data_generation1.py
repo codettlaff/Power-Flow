@@ -7,6 +7,7 @@ Created on Mon Aug 24 16:56:28 2026
 
 import os
 import copy
+import random
 import numpy as np
 from tqdm import tqdm
 
@@ -132,3 +133,14 @@ def create_dataset(
         'Y_labels': np.array(['P', 'V', 'Q', 'Theta']),
         'edge_index': edge_index,
         'edge_attr': edge_attr}
+
+def train_test_split(dataset, train_ratio=0.8):
+    n = len(dataset['X'])
+    indices = list(range(n))
+    random.shuffle(indices)
+    split = int(train_ratio * n)
+    
+    train = {k: v[indices[:split]] if k in ['X', 'Y', 'edge_attr'] else v for k, v in dataset.items()}
+    test = {k: v[indices[split:]] if k in ['X', 'Y', 'edge_attr'] else v for k, v in dataset.items()}
+    
+    return train, test
