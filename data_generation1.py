@@ -348,7 +348,7 @@ if __name__ == '__main__':
     dataset = create_dataset(
         max_load_net,
         n_samples,
-        per_unit=False,
+        per_unit=True,
         perturb_loads=True,
         load_scale_factor=load_scale_factor,
         perturb_generator_powers=True,
