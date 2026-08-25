@@ -244,13 +244,11 @@ def create_sample(
 def convert_to_per_unit(data, bases):
     S_base = bases['S_base']
     V_base = bases['V_base']
-    Z_base = V_base**2 / S_base
 
     data = data.copy()
     data[..., 0] /= S_base  # P
     data[..., 1] /= V_base  # V
     data[..., 2] /= S_base  # Q
-    # data[..., 3] = Theta unchanged
 
     return data
 
@@ -310,42 +308,7 @@ def create_dataset(
         'edge_index': edge_index,
         'edge_attr': edge_attr,
         'per_unit': per_unit,
-        'bases': bases
-    }
-
-def create_dataset_old(
-        net,
-        n_samples,
-        perturb_loads=True,
-        load_scale_factor=(0.7, 1.3),
-        perturb_generator_powers=True,
-        gen_powers_scale_factor=(0.7,1.3),
-        perturb_generator_voltages=True,
-        gen_voltages_scale_factor=(0.98,1.02)):
-    
-    edge_index, edge_attr = get_edge_data(net)
-    bases = get_system_bases(net)
-    X, Y = [], []
-    
-    for _ in tqdm(range(n_samples), desc='Generating samples'):
-        x, y = create_sample(
-            net,
-            perturb_loads,
-            load_scale_factor,
-            perturb_generator_powers,
-            gen_powers_scale_factor,
-            perturb_generator_voltages,
-            gen_voltages_scale_factor)
-        X.append(x)
-        Y.append(y)
-
-    return {
-        'X': np.array(X),
-        'Y': np.array(Y),
-        'X_labels': np.array(['P', 'V', 'Q', 'Theta', 'mP', 'mV', 'mQ', 'mTheta']),
-        'Y_labels': np.array(['P', 'V', 'Q', 'Theta']),
-        'edge_index': edge_index,
-        'edge_attr': edge_attr}
+        'bases': bases}
 
 def train_test_split(dataset, train_ratio=0.8):
     n = len(dataset['X'])
