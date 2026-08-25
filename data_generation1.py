@@ -170,6 +170,7 @@ def create_sample(
 
     n = len(net.bus)
     X = np.zeros((n, 8), dtype=np.float32)
+    Y = np.zeros((n, 4), dtype=np.float32)
 
     slack = int(net.ext_grid.iloc[0].bus)
     pv = set(net.gen.bus.astype(int))
@@ -182,6 +183,7 @@ def create_sample(
         Q = load.q_mvar.sum()
 
         X[bus] = [P, 0, Q, 0, 1, 0, 1, 0]
+        Y[bus] = X[bus][:4]
 
     # PV buses
     for bus in pv:
@@ -198,6 +200,7 @@ def create_sample(
             0,
             0
         ]
+        Y[bus] = X[bus][:4]
 
     # Slack bus
     ext = net.ext_grid.iloc[0]
@@ -213,14 +216,28 @@ def create_sample(
         0,
         1
     ]
+    Y[slack] = X[slack][:4]
 
-    # Absolute-value outputs
-    Y = np.column_stack([
-        net.res_bus.p_mw.values,
-        net.res_bus.vm_pu.values * net.bus.vn_kv.values,
-        net.res_bus.q_mvar.values,
+    # Finish constructing Y with unknown values from the solution.
+    Y[:, 0] = np.where(
+        X[:, 4] == 1, Y[:, 0], net.res_bus.p_mw.values
+    )
+
+    Y[:, 1] = np.where(
+        X[:, 5] == 1,
+        Y[:, 1],
+        net.res_bus.vm_pu.values * net.bus.vn_kv.values
+    )
+
+    Y[:, 2] = np.where(
+        X[:, 6] == 1, Y[:, 2], net.res_bus.q_mvar.values
+    )
+
+    Y[:, 3] = np.where(
+        X[:, 7] == 1,
+        Y[:, 3],
         np.deg2rad(net.res_bus.va_degree.values)
-    ]).astype(np.float32)
+    )
 
     return X, Y
 
