@@ -16,7 +16,7 @@ import pandapower as pp
 import pandapower.networks as pn
 
 def inspect_net(net):
-    pp.runpp(net)
+    if 'res_bus' not in net or net.res_bus.empty: pp.runpp(net)
     
     print("=== SYSTEM ===")
     print(f"Base power:       {net.sn_mva:.1f} MVA")
@@ -46,6 +46,8 @@ def inspect_net(net):
             f"\nMaximum transformer loading: "
             f"{net.res_trafo.loading_percent.max():.2f}%")
         
+    print('\n')
+        
     # Plots
     fig, ax = plt.subplots(2, 1, figsize=(8, 7))
 
@@ -69,7 +71,42 @@ def inspect_net(net):
 
     plt.tight_layout()
     plt.show()
+    
+def find_max_load_net(
+        net,
+        voltage_limits=(0.95, 1.05),
+        coarse_step=0.10,
+        fine_step=0.01,
+        max_scale=2.0):
 
+    net = copy.deepcopy(net)
+    base_load = net.load[['p_mw', 'q_mvar']].copy()
+    base_gen = net.gen[['p_mw']].copy()
+
+    def apply(scale):
+        net.load[['p_mw', 'q_mvar']] = base_load * scale
+        net.gen['p_mw'] = base_gen['p_mw'] * scale
+        pp.runpp(net)
+
+        v = net.res_bus.vm_pu
+        line = net.res_line.loading_percent
+
+        return (v.between(*voltage_limits).all() and
+                (line <= 100).all())
+
+    scale = 1.0
+
+    # Coarse search
+    while scale + coarse_step <= max_scale and apply(scale + coarse_step):
+        scale += coarse_step
+
+    # Fine search
+    while scale + fine_step <= max_scale and apply(scale + fine_step):
+        scale += fine_step
+
+    apply(scale)
+    return net
+    
 def get_system_bases(net):
     S_base = float(net.sn_mva)
     V_base = net.bus.vn_kv.values.astype(np.float32)
@@ -216,8 +253,9 @@ if __name__ == '__main__':
     gen_power_scale_factor = (0.7, 1.3)
     gen_voltage_scale_factor = (0.98, 1.02)
     
-    net = pn.case14()
-    inspect_net(net)
+    net = pn.case14() 
+    max_load_net = find_max_load_net(net)
+    inspect_net(max_load_net)
     
     dataset = create_dataset(
         net,
