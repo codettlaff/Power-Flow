@@ -252,23 +252,26 @@ if __name__ == '__main__':
     os.makedirs(data_dir, exist_ok=True)
     
     max_load_net_filepath = os.path.join(data_dir, 'case14_max_load_net.p')
-    
     train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
     
-    # n_samples = int(5e4)
-    n_samples = 100 # Test
-    load_scale_factor = (0.7, 1.3)
-    gen_power_scale_factor = (0.7, 1.3)
-    gen_voltage_scale_factor = (0.98, 1.02)
+    n_samples = int(5e4)
+    # n_samples = 100 # Test
+    load_scale_factor = (0.8, 1.2)
+    gen_power_scale_factor = (0.8, 1.2)
+    gen_voltage_scale_factor = (0.99, 1.01)
+    
+    get_max_load_net = False # Done
     
     net = pn.case14() 
-    max_load_net(net, step=0.1, trials=20, save_filepath=max_load_net_filepath)
+    # inspect_net(net)
+    
+    if get_max_load_net: max_load_net(net, step=0.1, trials=20, save_filepath=max_load_net_filepath)
     max_load_net = pp.from_pickle(max_load_net_filepath)
-    inspect_net(max_load_net)
+    # inspect_net(max_load_net)
     
     dataset = create_dataset(
-        net,
+        max_load_net,
         n_samples,
         perturb_loads=True,
         load_scale_factor=load_scale_factor,
