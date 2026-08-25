@@ -10,9 +10,65 @@ import copy
 import random
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 import pandapower as pp
 import pandapower.networks as pn
+
+def inspect_net(net):
+    pp.runpp(net)
+    
+    print("=== SYSTEM ===")
+    print(f"Base power:       {net.sn_mva:.1f} MVA")
+    print(f"Total load:       {net.load.p_mw.sum():.2f} MW")
+    print(f"Total generation: {net.res_gen.p_mw.sum():.2f} MW")
+    print(f"System losses:    {net.res_line.pl_mw.sum():.2f} MW")
+    
+    print("\n=== BUS VOLTAGES ===")
+    bus_results = net.res_bus[['vm_pu', 'va_degree']].copy()
+    bus_results.index.name = 'bus'
+    print(bus_results.to_string(float_format=lambda x: f'{x:.4f}'))
+    
+    print("\n=== LINE LOADING ===")
+    line_results = net.res_line[['loading_percent', 'p_from_mw', 'q_from_mvar', 'pl_mw']].copy()
+    line_results.index.name = 'line'
+    print(line_results.to_string(float_format=lambda x: f'{x:.2f}'))
+    print(
+        f"\nMaximum line loading: "
+        f"{net.res_line.loading_percent.max():.2f}%")
+    
+    if len(net.trafo):
+        print("\n=== TRANSFORMER LOADING ===")
+        print(
+            net.res_trafo[['loading_percent', 'p_hv_mw', 'q_hv_mvar']]
+            .to_string(float_format=lambda x: f'{x:.2f}'))
+        print(
+            f"\nMaximum transformer loading: "
+            f"{net.res_trafo.loading_percent.max():.2f}%")
+        
+    # Plots
+    fig, ax = plt.subplots(2, 1, figsize=(8, 7))
+
+    # Voltage profile
+    ax[0].plot(net.res_bus.vm_pu.values, marker='o')
+    ax[0].axhline(1.0, linestyle='--')
+    ax[0].set_ylabel('Voltage [p.u.]')
+    ax[0].set_xlabel('Bus')
+    ax[0].set_title('Bus Voltage Profile')
+    ax[0].grid(True)
+
+    # Line loading
+    ax[1].bar(
+        np.arange(len(net.line)),
+        net.res_line.loading_percent.values)
+    ax[1].axhline(100.0, linestyle='--')
+    ax[1].set_ylabel('Loading [%]')
+    ax[1].set_xlabel('Line')
+    ax[1].set_title('Line Loading')
+    ax[1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
 
 def get_system_bases(net):
     S_base = float(net.sn_mva)
@@ -161,6 +217,8 @@ if __name__ == '__main__':
     gen_voltage_scale_factor = (0.98, 1.02)
     
     net = pn.case14()
+    inspect_net(net)
+    
     dataset = create_dataset(
         net,
         n_samples,
