@@ -126,10 +126,105 @@ def train_model(
             
     torch.save(model.state_dict(), save_filepath)
     
+def convert_to_per_unit(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+
+    data = data.copy()
+    data[..., 0] /= S_base  # P
+    data[..., 1] /= V_base  # V
+    data[..., 2] /= S_base  # Q
+
+    return data
+
+
+def convert_to_absolute(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+
+    data = data.copy()
+    data[..., 0] *= S_base  # P
+    data[..., 1] *= V_base  # V
+    data[..., 2] *= S_base  # Q
+    # data[..., 3] = Theta unchanged
+
+    return data
+
+def predict_model(model, dataset, batch_size=32, device='cpu'):
+    model = model.to(device).eval()
+    
+    X = dataset['X']
+    Y = dataset['Y']
+    edge_index = torch.tensor(dataset['edge_index'], dtype=torch.long).to(device)
+    edge_attr = torch.tensor(dataset['edge_attr'], dtype=torch.float32).to(device)
+    preds = []
+    
+    with torch.no_grad():
+        for i in range(0, len(X), batch_size):
+            x = torch.tensor(X[i:i+batch_size], dtype=torch.float32).to(device)
+            preds.append(model(x, edge_index, edge_attr).cpu().numpy())
+            
+    return np.concatenate(preds), Y
+
 def test_model(
         model,
         test_dataset,
         results_filepath,
+        per_unit=False,
+        batch_size=32,
+        device='cpu',
+        include_knowns=True):
+    
+    preds, targets = predict_model(model, test_dataset, batch_size, device)
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
+    masks = test_dataset['X'][:, :, 4:8].astype(bool)
+    unknown = masks if not include_knowns else np.ones_like(masks, dtype=bool)
+    
+    # Convert units if necessary
+    bases = test_dataset['bases']
+    if test_dataset['per_unit'] != per_unit:
+        convert = convert_to_per_unit if per_unit else convert_to_absolute 
+        preds = convert(preds, bases)
+        targets = convert(targets, bases)
+        
+    metrics = {}
+    bus_metrics = np.full((targets.shape[1], 4), np.nan)
+    
+    for i, name in enumerate(var_names):
+        pred = preds[:, :, i][unknown[:, :, i]]
+        target = targets[:, :, i][unknown[:, :, i]]
+        error = pred - target
+        mse = np.mean(error ** 2)
+        metrics[name] = {
+            'MSE': mse,
+            'RMSE': np.sqrt(mse),
+            'MAE': np.mean(np.abs(error)),
+            'R2': 1 - np.sum(error ** 2) / np.sum((target - target.mean()) ** 2),
+            'Mean Bias': np.mean(error),
+            'Regression Slope': np.polyfit(target, pred, 1)[0]}
+        
+        for bus in range(targets.shape[1]):
+            mask = unknown[:, bus, i]
+            if mask.any():
+                bus_metrics[bus, i] = np.sqrt(
+                    np.mean((preds[:, bus, i][mask] -
+                             targets[:, bus, i][mask]) ** 2))
+                
+    results = {
+        'preds': preds,
+        'targets': targets,
+        'Y_labels': var_names,
+        'metrics': metrics,
+        'bus_rmse': bus_metrics,
+        'metrics_labels': np.array(['P_RMSE', 'V_RMSE', 'Q_RMSE', 'Theta_RMSE']),
+        'per_unit': per_unit,
+        'bases': bases}
+    
+def test_model_old(
+        model,
+        test_dataset,
+        results_filepath,
+        per_unit=False,
         batch_size=32,
         device='cpu',
         include_knowns=True):
@@ -167,6 +262,22 @@ def test_model(
         eval_preds, eval_targets = preds.clone(), targets.clone()
         eval_preds[~unknown] = float('nan')
         eval_targets[~unknown] = float('nan')
+        
+    # Convert evaluation data to absolute units 
+    bases = test_dataset['bases']
+    if test_data['per_unit'] and not per_unit:
+        # convert to absolute values
+        eval_preds = torch.tensor(
+            convert_to_absolute(eval_preds.numpy(), bases))
+        eval_targets = torch.tensor(
+            convert_to_absolute(eval_targets.numpy(), bases))
+        
+    if not test_data['per_unit'] and per_unit:
+        # convert to per-unit
+        eval_preds = torch.tensor(
+            convert_to_per_unit(eval_preds.numpy(), bases))
+        eval_targets = torch.tensor(
+            convert_to_per_unit(eval_targets.numpy(), bases))
         
     metrics = {}
     bus_metrics = np.full((Y.shape[1], 4), np.nan)
@@ -212,6 +323,8 @@ def test_model(
                         targets[:, bus, i][mask]
                     )
                 ).item()
+                
+    bases = test_dataset['bases']
 
     results = {
         'preds': eval_preds.numpy(),
@@ -221,7 +334,9 @@ def test_model(
         'bus_metrics': bus_metrics,
         'metrics_labels': np.array([
             'P_RMSE', 'V_RMSE', 'Q_RMSE', 'Theta_RMSE'
-        ])
+        ]),
+        'per_unit': per_unit,
+        'bases': bases
     }
 
     np.save(results_filepath, results, allow_pickle=True)
