@@ -261,7 +261,7 @@ if __name__ == '__main__':
     gen_power_scale_factor = (0.8, 1.2)
     gen_voltage_scale_factor = (0.99, 1.01)
     
-    get_max_load_net = False # Done
+    get_max_load_net = True # Done
     
     net = pn.case14() 
     # inspect_net(net)
