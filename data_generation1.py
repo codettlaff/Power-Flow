@@ -16,7 +16,7 @@ import pandapower as pp
 import pandapower.networks as pn
 
 def inspect_net(net):
-    if 'res_bus' not in net or net.res_bus.empty: pp.runpp(net)
+    if 'res_bus' not in net or net.res_bus.empty: pp.runpp(net, numba=False)
     
     print("=== SYSTEM ===")
     print(f"Base power:       {net.sn_mva:.1f} MVA")
@@ -71,41 +71,48 @@ def inspect_net(net):
 
     plt.tight_layout()
     plt.show()
-    
-def find_max_load_net(
-        net,
-        voltage_limits=(0.95, 1.05),
-        coarse_step=0.10,
-        fine_step=0.01,
-        max_scale=2.0):
 
+def max_load_net(net, step, trials, save_filepath, v_limits=(0.95, 1.05)):
     net = copy.deepcopy(net)
-    base_load = net.load[['p_mw', 'q_mvar']].copy()
-    base_gen = net.gen[['p_mw']].copy()
 
-    def apply(scale):
-        net.load[['p_mw', 'q_mvar']] = base_load * scale
-        net.gen['p_mw'] = base_gen['p_mw'] * scale
-        pp.runpp(net)
+    def test(net):
+        try:
+            pp.runpp(net, numba=False)
+        except pp.LoadflowNotConverged:
+            return True, True
 
         v = net.res_bus.vm_pu
-        line = net.res_line.loading_percent
+        return v.max() > v_limits[1], v.min() < v_limits[0]
 
-        return (v.between(*voltage_limits).all() and
-                (line <= 100).all())
+    def inc_load(net, scale):
+        base = copy.deepcopy(net)
+        for _ in range(trials):
+            trial = copy.deepcopy(base)
+            bus = np.random.choice(trial.load.index)
+            trial.load.loc[bus, ['p_mw', 'q_mvar']] *= 1 + scale
+            over, under = test(trial)
+            if under:
+                return base
+            base = trial
+        return base
 
-    scale = 1.0
+    def inc_gen(net, scale):
+        base = copy.deepcopy(net)
+        for _ in range(trials):
+            trial = copy.deepcopy(base)
+            gen = np.random.choice(trial.gen.index)
+            trial.gen.loc[gen, 'p_mw'] *= 1 + scale
+            over, under = test(trial)
+            if over:
+                return base
+            base = trial
+        return base
 
-    # Coarse search
-    while scale + coarse_step <= max_scale and apply(scale + coarse_step):
-        scale += coarse_step
+    for _ in tqdm(range(trials), desc='Trial'):
+        net = inc_load(net, step)
+        net = inc_gen(net, step)
 
-    # Fine search
-    while scale + fine_step <= max_scale and apply(scale + fine_step):
-        scale += fine_step
-
-    apply(scale)
-    return net
+    pp.to_pickle(net, save_filepath)
     
 def get_system_bases(net):
     S_base = float(net.sn_mva)
@@ -153,7 +160,7 @@ def create_sample(
     if perturb_generator_powers: scale_generator_powers(net, gen_powers_scale_factor)
     if perturb_generator_voltages: scale_generator_voltages(net, gen_voltages_scale_factor)
     
-    pp.runpp(net)
+    pp.runpp(net, numba=False)
     
     n = len(net.bus)
     X = np.zeros((n, 8), dtype=np.float32)
@@ -244,6 +251,8 @@ if __name__ == '__main__':
     data_dir = os.path.join(base_dir, 'data')
     os.makedirs(data_dir, exist_ok=True)
     
+    max_load_net_filepath = os.path.join(data_dir, 'case14_max_load_net.p')
+    
     train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
     
@@ -254,7 +263,8 @@ if __name__ == '__main__':
     gen_voltage_scale_factor = (0.98, 1.02)
     
     net = pn.case14() 
-    max_load_net = find_max_load_net(net)
+    max_load_net(net, step=0.1, trials=20, save_filepath=max_load_net_filepath)
+    max_load_net = pp.from_pickle(max_load_net_filepath)
     inspect_net(max_load_net)
     
     dataset = create_dataset(
