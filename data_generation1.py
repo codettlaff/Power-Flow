@@ -188,10 +188,14 @@ def create_sample(
     # PV buses
     for bus in pv:
         gen = net.gen[net.gen.bus == bus]
+        load = net.load[net.load.bus == bus]
+        P_gen = gen.p_mw.sum()
+        P_load = load.p_mw.sum()
+        P = P_gen - P_load
         V_kv = gen.vm_pu.iloc[0] * net.bus.vn_kv.iloc[bus]
 
         X[bus] = [
-            gen.p_mw.sum(),
+            P,
             V_kv,
             0,
             0,
@@ -218,26 +222,23 @@ def create_sample(
     ]
     Y[slack] = X[slack][:4]
 
-    # Finish constructing Y with unknown values from the solution.
-    Y[:, 0] = np.where(
-        X[:, 4] == 1, Y[:, 0], net.res_bus.p_mw.values
-    )
+    # Finish constructing Y with unknown values from the power-flow solution.
+    # Known values are already present in Y and must not be overwritten.
+    unknown_P = X[:, 4] == 0
+    unknown_V = X[:, 5] == 0
+    unknown_Q = X[:, 6] == 0
+    unknown_Theta = X[:, 7] == 0
+    
+    Y[unknown_P, 0] = net.res_bus.p_mw.values[unknown_P]
+    
+    Y[unknown_V, 1] = (
+        net.res_bus.vm_pu.values[unknown_V]
+        * net.bus.vn_kv.values[unknown_V])
 
-    Y[:, 1] = np.where(
-        X[:, 5] == 1,
-        Y[:, 1],
-        net.res_bus.vm_pu.values * net.bus.vn_kv.values
-    )
+    Y[unknown_Q, 2] = net.res_bus.q_mvar.values[unknown_Q]
 
-    Y[:, 2] = np.where(
-        X[:, 6] == 1, Y[:, 2], net.res_bus.q_mvar.values
-    )
-
-    Y[:, 3] = np.where(
-        X[:, 7] == 1,
-        Y[:, 3],
-        np.deg2rad(net.res_bus.va_degree.values)
-    )
+    Y[unknown_Theta, 3] = np.deg2rad(
+        net.res_bus.va_degree.values[unknown_Theta])
 
     return X, Y
 
@@ -343,7 +344,7 @@ if __name__ == '__main__':
     
     if get_max_load_net: max_load_net(net, step=0.1, trials=20, save_filepath=max_load_net_filepath)
     max_load_net = pp.from_pickle(max_load_net_filepath)
-    # inspect_net(max_load_net)
+    inspect_net(max_load_net)
     
     dataset = create_dataset(
         max_load_net,
