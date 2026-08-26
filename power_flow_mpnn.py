@@ -221,7 +221,7 @@ def test_model(
         'bases': bases}
     return results
             
-def plot_distributions(targets, preds, variable_list, bus=None):
+def plot_distributions(targets, preds, variable_list, bus=None, save_folderpath=None):
     for i, variable in enumerate(variable_list):
         if bus is None:
             true = targets[:, :, i].ravel()
@@ -243,9 +243,10 @@ def plot_distributions(targets, preds, variable_list, bus=None):
             (f' — Bus {bus}' if bus is not None else '')
         )
         plt.legend()
+        if save_folderpath: plt.savefig(os.path.join(save_folderpath, f'bus{bus}_{variable}_distribution.png'))
         plt.show()
         
-def plot_bus_metrics(bus_metrics, metrics_labels):
+def plot_bus_metrics(bus_metrics, metrics_labels, save_filepath=None):
     plt.figure()
     buses = np.arange(1, len(bus_metrics) + 1)
 
@@ -257,9 +258,10 @@ def plot_bus_metrics(bus_metrics, metrics_labels):
     plt.xticks(buses)
     plt.legend()
     plt.grid(True, alpha=0.3)
+    if save_filepath: plt.savefig(save_filepath) 
     plt.show()
     
-def plot_scatterplots(targets, preds, variable_list, bus_list):
+def plot_scatterplots(targets, preds, variable_list, bus_list, save_folderpath=None):
     var_indices = {'P': 0, 'V': 1, 'Q': 2, 'Theta': 3}
 
     for bus in bus_list:
@@ -294,9 +296,10 @@ def plot_scatterplots(targets, preds, variable_list, bus_list):
             plt.title(f'{variable} — Bus {bus}')
             plt.legend()
             plt.tight_layout()
+            if save_folderpath: plt.savefig(os.path.join(save_folderpath, f'bus{bus}_{variable}_scatterplot.png'))
             plt.show()
     
-def plot_pred_vs_true(targets, preds, variable_list, bus_list):
+def plot_pred_vs_true(targets, preds, variable_list, bus_list, save_folderpath=None):
     var_indices = {'P':0, 'V':1, 'Q':2, 'Theta':3}
     for bus in bus_list:
         for variable in variable_list:
@@ -315,6 +318,7 @@ def plot_pred_vs_true(targets, preds, variable_list, bus_list):
             plt.title(f'{variable} — Bus {bus}')
             plt.legend()
             plt.tight_layout()
+            if save_folderpath: plt.savefig(os.path.join(save_folderpath, f'bus{bus}_{variable}_pred_vs_true.png'))
             plt.show()
             
 if __name__ == '__main__':
