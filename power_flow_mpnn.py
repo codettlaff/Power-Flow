@@ -335,13 +335,17 @@ if __name__ == '__main__':
     train_data = np.load(train_data_filepath, allow_pickle=True).item()
     test_data = np.load(test_data_filepath, allow_pickle=True).item()
     
-    model = PowerFlowGNN()
+    num_layers = 1
+    model = PowerFlowGNN(num_layers=num_layers)
     save_filepath = 'case14_model1.pth'
+    epochs = 10
+    lr = 1e-3
+    loss_weights = [1,1,1,1]
     
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    # test_model(model, test_data, results_filepath, include_knowns=False)
+    # test_model(model, test_data, results_filepath, per_unit=False, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
     # print_metrics(results['metrics'])
