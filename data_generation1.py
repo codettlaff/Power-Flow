@@ -331,7 +331,7 @@ if __name__ == '__main__':
     train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
     
-    n_samples = int(5e5) # 50,000 samples
+    n_samples = int(5e4) # 50,000 samples
     load_scale_factor = (0.8, 1.2)
     gen_power_scale_factor = (0.8, 1.2)
     gen_voltage_scale_factor = (0.99, 1.01)
