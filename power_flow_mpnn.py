@@ -45,6 +45,26 @@ class PowerFlowMPNN(MessagePassing):
         return h + self.update_net(x) # Residual connection
     
     def forward(self, h, edge_index, edge_attr):
+        src, dst = edge_index
+    
+        h_i = h[:, dst, :]                    # [B, E, H]
+        h_j = h[:, src, :]                    # [B, E, H]
+        edge_attr = edge_attr.unsqueeze(0).expand(h.size(0), -1, -1)    # [1, E, 2]
+    
+        messages = self.message_net(
+            torch.cat([h_i, h_j, edge_attr], dim=-1)
+        )
+    
+        aggr = torch.zeros_like(h)
+        aggr.scatter_add_(
+            1,
+            dst.view(1, -1, 1).expand_as(messages),
+            messages
+        )
+    
+        return h + self.update_net(torch.cat([h, aggr], dim=-1))
+    
+    def forward_old(self, h, edge_index, edge_attr):
         return self.propagate(
             edge_index,
             h=h,
@@ -107,13 +127,14 @@ def train_model(
         model.train()
         indices = torch.randperm(len(X))
         
+        edge_attr = torch.tensor(edge_attr, dtype=torch.float32)
         for i in tqdm(range(0, len(X), batch_size),
                        desc=f"Epoch {epoch+1}/{epochs}"):
             
             idx = indices[i:i+batch_size]
             x, y = X[idx].to(device), Y[idx].to(device)
             mask = masks[idx].to(device)
-            ea = edge_attr[idx].to(device)
+            ea = edge_attr.to(device)
             
             optimizer.zero_grad()
             pred = model(x, edge_index.to(device), ea)
@@ -176,16 +197,16 @@ def test_model(
         include_knowns=True):
     
     preds, targets = predict_model(model, test_dataset, batch_size, device)
-    var_names = np.array(['P', 'V', 'Q', 'Theta'])
-    masks = test_dataset['X'][:, :, 4:8].astype(bool)
-    unknown = masks if not include_knowns else np.ones_like(masks, dtype=bool)
-    
     # Convert units if necessary
     bases = test_dataset['bases']
     if test_dataset['per_unit'] != per_unit:
         convert = convert_to_per_unit if per_unit else convert_to_absolute 
         preds = convert(preds, bases)
         targets = convert(targets, bases)
+    
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
+    masks = test_dataset['X'][:, :, 4:8].astype(bool)
+    unknown = masks if not include_knowns else np.ones_like(masks, dtype=bool)
         
     metrics = {}
     bus_metrics = np.full((targets.shape[1], 4), np.nan)
@@ -194,14 +215,16 @@ def test_model(
         pred = preds[:, :, i][unknown[:, :, i]]
         target = targets[:, :, i][unknown[:, :, i]]
         error = pred - target
+        denom = np.sum((target - target.mean()) ** 2)
         mse = np.mean(error ** 2)
         metrics[name] = {
             'MSE': mse,
             'RMSE': np.sqrt(mse),
             'MAE': np.mean(np.abs(error)),
-            'R2': 1 - np.sum(error ** 2) / np.sum((target - target.mean()) ** 2),
+            'R2': 1 - np.sum(error ** 2) / denom if denom > 0 else np.nan,
             'Mean Bias': np.mean(error),
-            'Regression Slope': np.polyfit(target, pred, 1)[0]}
+            # 'Regression Slope': np.polyfit(target, pred, 1)[0]
+            }
         
         for bus in range(targets.shape[1]):
             mask = unknown[:, bus, i]
@@ -219,7 +242,7 @@ def test_model(
         'metrics_labels': np.array(['P_RMSE', 'V_RMSE', 'Q_RMSE', 'Theta_RMSE']),
         'per_unit': per_unit,
         'bases': bases}
-    return results
+    np.save(results_filepath, results, allow_pickle=True)
             
 def plot_distributions(targets, preds, variable_list, bus=None, save_folderpath=None):
     for i, variable in enumerate(variable_list):
@@ -234,8 +257,9 @@ def plot_distributions(targets, preds, variable_list, bus=None, save_folderpath=
             continue
 
         plt.figure()
-        plt.hist(true, bins=50, alpha=0.5, label='True')
-        plt.hist(pred, bins=50, alpha=0.5, label='Predicted')
+        bins = np.linspace(min(true.min(), pred.min()), max(true.max(), pred.max()), 51)
+        plt.hist(true, bins=bins, alpha=0.5, label='True')
+        plt.hist(pred, bins=bins, alpha=0.5, label='Predicted')
         plt.xlabel(variable)
         plt.ylabel('Frequency')
         plt.title(
@@ -345,7 +369,7 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    # test_model(model, test_data, results_filepath, per_unit=False, include_knowns=False)
+    test_model(model, test_data, results_filepath, per_unit=False, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
     # print_metrics(results['metrics'])
