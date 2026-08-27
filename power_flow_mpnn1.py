@@ -348,6 +348,19 @@ def compute_metrics(preds, targets, mask):
         
     return metrics
 
+def print_metrics(metrics):
+    print(f"{'Variable':<10} {'MSE':>12} {'RMSE':>12} {'Bias':>12} {'R²':>12}")
+    print("-" * 60)
+
+    for name, values in metrics.items():
+        print(
+            f"{name:<10} "
+            f"{values['mse']:>12.6f} "
+            f"{values['rmse']:>12.6f} "
+            f"{values['bias']:>12.6f} "
+            f"{values['R2']:>12.6f}"
+        )
+
 def test_model(
         model,
         test_dataset,
@@ -488,5 +501,10 @@ if __name__ == '__main__':
     preds_absolute = convert_to_absolute(preds_pu, bases)
     targets_absolute = convert_to_absolute(targets_pu, bases)
     metrics_absolute = compute_metrics(preds_absolute, targets_absolute, mask)
+    
+    print('Per-Unit Metrics:\n')
+    print_metrics(metrics_pu)
+    print('Absolute Metrics:\n')
+    print_metrics(metrics_absolute)
     
     print('')
