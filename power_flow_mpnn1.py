@@ -6,15 +6,12 @@ Created on Wed Aug 26 14:54:48 2026
 """
 
 import os
+import numpy as np
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+
 import torch
 import torch.nn as nn
-from torch_geometric.nn import MessagePassing
-import torch.nn.functional as F
-from torch_geometric.loader import DataLoader
-from tqdm import tqdm
-
-import random
-import numpy as np
 
 # what is the difference between a torch vector and an np array?
 # What's the nn.Module class that's being inherited?
@@ -368,6 +365,14 @@ def test_model(
     
     np.save(results_filepath, results, allow_pickle=True)
     
+def plot_loss_history(loss_history):
+    plt.plot(loss_history)
+    plt.xlabel('Batch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss')
+    plt.grid(True)
+    plt.show()
+    
 if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
@@ -407,5 +412,7 @@ if __name__ == '__main__':
         loss_weights=loss_weights)
     
     model.load_state_dict(torch.load(model_filepath, weights_only=True))
+    
+    plot_loss_history(loss_history)
     
     print('')
