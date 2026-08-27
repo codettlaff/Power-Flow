@@ -324,6 +324,30 @@ def predict(
     testing_loss = total_loss / total_batches
     return np.concatenate(preds), Y.numpy(), testing_loss
 
+def compute_metrics(preds, targets, mask):
+    
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
+    mask = ~mask
+    
+    metrics = {}
+    for i, name in enumerate(var_names):
+        
+        pred = preds[:, :, i][mask[:, :, i]]
+        target = targets[:, :, i][mask[:, :, i]]
+        error = pred - target
+        bias = np.mean(error)
+        mse = np.mean(error ** 2)
+        denom = np.sum((target - target.mean()) ** 2)
+        if denom > 0: R2 = 1 - np.sum(error ** 2) / denom
+        else: R2 = np.nan
+        metrics[name] = {
+            'mse': mse,
+            'rmse': np.sqrt(mse),
+            'bias': bias,
+            'R2': R2}
+        
+    return metrics
+
 def test_model(
         model,
         test_dataset,
@@ -432,7 +456,7 @@ if __name__ == '__main__':
     # Model and Training Parameters
     num_layers = 5
     model = PowerFlowGNN(num_layers=num_layers)
-    epochs = 100
+    epochs = 500
     lr = 1e-3
     loss_weights = [1, 1, 1, 1]
     
@@ -452,9 +476,12 @@ if __name__ == '__main__':
         np.save(loss_history_filepath, loss_history)
     
     model.load_state_dict(torch.load(model_filepath, weights_only=True))
-    loss_history = np.load(loss_history_filepath)
-    plot_loss_history(loss_history)
+    # loss_history = np.load(loss_history_filepath)
+    # plot_loss_history(loss_history)
+    
+    mask = test_data['X'][:, :, 4:8].astype(bool)
     
     preds, targets, testing_loss = predict(model, test_data, batch_size=32, device='cpu')
+    metrics = compute_metrics(preds, targets, mask)
     
     print('')
