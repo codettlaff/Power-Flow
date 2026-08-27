@@ -291,8 +291,8 @@ def predict(
         loss_weights=[1, 1, 1, 1]):
     
     model = model.to(device).eval()
-    X = dataset['X']
-    Y = dataset['Y']
+    X = torch.tensor(dataset['X'], dtype=torch.float32)
+    Y = torch.tensor(dataset['Y'], dtype=torch.float32)
     edge_index = torch.tensor(dataset['edge_index'], dtype=torch.long).to(device)
     edge_attr = torch.tensor(dataset['edge_attr'], dtype=torch.float32).to(device)
     
@@ -312,7 +312,9 @@ def predict(
             pred = model(x, edge_index, edge_attr)
             preds.append(pred.cpu().numpy())
             
-            unknown = 1 - mask,
+            # Testing loss calculation
+            weights = torch.tensor(loss_weights, dtype=torch.float32, device=device).view(1, 1, 4)
+            unknown = (1 - mask).float()
             loss = ((pred - y) ** 2 * unknown * weights).sum()
             loss /= (unknown * weights).sum()
             
@@ -427,7 +429,8 @@ if __name__ == '__main__':
     
     model = PowerFlowGNN(num_layers=num_layers)
     
-    loss_history = train_model(
+    train = False # already done
+    if train: loss_history = train_model(
         model, 
         train_data,
         model_filepath,
@@ -439,6 +442,8 @@ if __name__ == '__main__':
     
     model.load_state_dict(torch.load(model_filepath, weights_only=True))
     
-    plot_loss_history(loss_history)
+    # plot_loss_history(loss_history)
+    
+    preds, targets, testing_loss = predict(model, test_data, batch_size=32, device='cpu')
     
     print('')
