@@ -78,7 +78,7 @@ class PowerFlowMPNN(nn.Module):
         h_destination = h[:, destination, :]
         
         # Add batch dimension to edge features
-        edge_features = edge_attr.unsqueeze()
+        edge_features = edge_attr.unsqueeze(0)
         edge_features = edge_features.expand(h.size(0), -1, -1)
         
         # Combine source state, destination state, edge features
@@ -263,7 +263,7 @@ def train_model(
             loss.backward()
             optimizer.step()
             
-        loss_history.append(loss)
+        loss_history.append(loss.item())
             
     torch.save(model.state_dict(), save_filepath)
     return loss_history
