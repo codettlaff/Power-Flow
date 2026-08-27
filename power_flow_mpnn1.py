@@ -367,3 +367,45 @@ def test_model(
         'bases': bases}
     
     np.save(results_filepath, results, allow_pickle=True)
+    
+if __name__ == '__main__':
+    
+    base_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(base_dir, 'data')
+    train_data_filepath = os.path.join(data_dir, 'case14_32sample_train.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_32sample_test.npy')
+    
+    models_dir = os.path.join(base_dir, 'models')
+    os.makedirs(models_dir, exist_ok=True)
+    model_filepath = os.path.join(models_dir, '32_sample_mdl.npy')
+    
+    results_dir = os.path.join(base_dir, 'results')
+    results_folderpath = os.path.join(results_dir, '32sample')
+    os.makedirs(results_folderpath, exist_ok=True)
+    results_filepath = os.path.join(results_folderpath, 'case14_results.npy')
+    
+    train_data = np.load(train_data_filepath, allow_pickle=True).item()
+    test_data = np.load(test_data_filepath, allow_pickle=True).item()
+    
+    # Model and Training Parameters
+    num_layers = 5
+    model = PowerFlowGNN(num_layers=num_layers)
+    epochs = 500
+    lr = 1e-3
+    loss_weights = [1, 1, 1, 1]
+    
+    model = PowerFlowGNN(num_layers=num_layers)
+    
+    loss_history = train_model(
+        model, 
+        train_data,
+        model_filepath,
+        epochs=epochs,
+        batch_size=32,
+        lr=lr,
+        device='cpu',
+        loss_weights=loss_weights)
+    
+    model.load_state_dict(torch.load(model_filepath, weights_only=True))
+    
+    print('')
