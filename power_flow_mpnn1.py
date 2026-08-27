@@ -462,7 +462,7 @@ if __name__ == '__main__':
     
     model = PowerFlowGNN(num_layers=num_layers)
     
-    train = True # already done
+    train = False # already done
     if train: 
         loss_history = train_model(
             model, 
@@ -480,8 +480,13 @@ if __name__ == '__main__':
     # plot_loss_history(loss_history)
     
     mask = test_data['X'][:, :, 4:8].astype(bool)
+    bases = test_data['bases']
     
-    preds, targets, testing_loss = predict(model, test_data, batch_size=32, device='cpu')
-    metrics = compute_metrics(preds, targets, mask)
+    preds_pu, targets_pu, testing_loss = predict(model, test_data, batch_size=32, device='cpu')
+    metrics_pu = compute_metrics(preds_pu, targets_pu, mask)
+    
+    preds_absolute = convert_to_absolute(preds_pu, bases)
+    targets_absolute = convert_to_absolute(targets_pu, bases)
+    metrics_absolute = compute_metrics(preds_absolute, targets_absolute, mask)
     
     print('')
