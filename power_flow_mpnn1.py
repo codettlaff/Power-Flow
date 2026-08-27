@@ -466,6 +466,28 @@ def plot_loss_history(loss_history):
     plt.grid(True)
     plt.show()
     
+def plot_bus_metrics(bus_metrics):
+    variables = ['P', 'V', 'Q', 'Theta']
+    metrics = ['mse', 'rmse', 'bias', 'R2']
+
+    bus_indices = sorted(bus_metrics.keys())
+
+    for variable in variables:
+        for metric in metrics:
+            values = [
+                bus_metrics[bus].get(variable, {}).get(metric, np.nan)
+                for bus in bus_indices
+            ]
+
+            plt.figure()
+            plt.bar(bus_indices, values)
+            plt.xlabel('Bus Index')
+            plt.ylabel(metric.upper())
+            plt.title(f'{variable} {metric.upper()} by Bus')
+            plt.xticks(bus_indices)
+            plt.grid(axis='y')
+            plt.show()
+    
 if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
@@ -530,7 +552,7 @@ if __name__ == '__main__':
     preds_absolute = convert_to_absolute(preds_pu, bases)
     targets_absolute = convert_to_absolute(targets_pu, bases)
     metrics_absolute = compute_metrics(preds_absolute, targets_absolute, mask)
-    bus_metrics_absolute = compute_bus_metrics(preds_pu, targets_pu, mask)
+    bus_metrics_absolute = compute_bus_metrics(preds_absolute, targets_absolute, mask)
     
     print('Per-Unit Metrics:\n')
     print_metrics(metrics_pu)
@@ -541,5 +563,7 @@ if __name__ == '__main__':
     print_metrics(bus_metrics_pu[0])
     print('Absolute Slack-Bus Metrics:\n')
     print_metrics(bus_metrics_absolute[0])
+    
+    plot_bus_metrics(bus_metrics_absolute)
     
     print('')
