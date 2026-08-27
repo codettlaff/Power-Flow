@@ -220,4 +220,150 @@ class PowerFlowGNN(nn.Module):
         output = self.readout(h)
         
         return output
+    
+def train_model(
+        model,
+        dataset,
+        save_filepath,
+        epochs=10,
+        batch_size=32,
+        lr=1e-3,
+        device='cpu',
+        loss_weights=[1, 1, 1, 1]):
+    
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    
+    X = torch.tensor(dataset['X'], dtype=torch.float32)
+    Y = torch.tensor(dataset['Y'], dtype=torch.float32)
+    edge_index = torch.tensor(dataset['edge_index'], dtype=torch.long).to(device)
+    edge_attr = torch.tensor(dataset['edge_attr'], dtype=torch.float32).to(device)
+    masks = X[:, :, 4:8]
+    weights = torch.tensor(loss_weights, dtype=torch.float32).to(device)
+    
+    loss_history = []
+    for epoch in range(epochs):
+        model.train()
+        indices = torch.randperm(len(X))
+        
+        for start in tqdm(range(0, len(X), batch_size), desc=f'Epoch {epoch + 1}/{epochs}'):
+            idx = indices[start:start + batch_size]
+            x = X[idx].to(device)
+            y = Y[idx].to(device)
+            mask = masks[idx].to(device)
             
+            optimizer.zero_grad()
+            pred = model(x, edge_index, edge_attr)
+            
+            # Compute weighted MSE only for unknown variables.
+            unknown = 1 - mask
+            loss = ((pred - y) ** 2 * unknown * weights).sum()
+            loss /= (unknown * weights).sum()
+            
+            loss.backward()
+            optimizer.step()
+            
+        loss_history.append(loss)
+            
+    torch.save(model.state_dict(), save_filepath)
+    return loss_history
+
+def convert_to_per_unit(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+    data = data.copy()
+    data[..., 0] /= S_base  # P
+    data[..., 1] /= V_base  # V
+    data[..., 2] /= S_base  # Q
+    return data
+
+def convert_to_absolute(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+    data = data.copy()
+    data[..., 0] *= S_base  # P
+    data[..., 1] *= V_base  # V
+    data[..., 2] *= S_base  # Q
+    return data
+
+def predict(model, dataset, batch_size=32, device='cpu'):
+    model = model.to(device).eval()
+    X = dataset['X']
+    Y = dataset['Y']
+    edge_index = torch.tensor(dataset['edge_index'], dtype=torch.long).to(device)
+    edge_attr = torch.tensor(dataset['edge_attr'], dtype=torch.float32).to(device)
+    preds = []
+    with torch.no_grad():
+        for i in range(0, len(X), batch_size):
+            x = torch.tensor(X[i:i+batch_size], dtype=torch.float32).to(device)
+            preds.append(model(x, edge_index, edge_attr).cpu().numpy())
+    return np.concatenate(preds), Y
+
+def test_model(
+        model,
+        test_dataset,
+        results_filepath,
+        per_unit=False,
+        batch_size=32,
+        device='cpu',
+        include_knowns=True):
+    
+    preds, targets = predict(model, test_dataset, batch_size, device)
+    
+    # Convert units if necessary
+    bases = test_dataset['bases']
+    if test_dataset['per_unit'] != per_unit:
+        convert = convert_to_per_unit if per_unit else convert_to_absolute 
+        preds = convert(preds, bases)
+        targets = convert(targets, bases)
+        
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
+    masks = test_dataset['X'][:, :, 4:8].astype(bool)
+    evaluation_mask = (
+        np.ones_like(masks, dtype=bool)
+        if include_knowns else ~masks)
+    
+    metrics = {}
+    bus_rmse = np.full((targets.shape[1], 4), np.nan)
+    
+    for i, name in enumerate(var_names):
+        
+        pred = preds[:, :, i][evaluation_mask[:, :, i]]
+        target = targets[:, :, i][evaluation_mask[:, :, i]]
+
+        error = pred - target
+        mse = np.mean(error ** 2)
+        
+        metrics[name] = {
+            'MSE': mse,
+            'RMSE': np.sqrt(mse),
+            'MAE': np.mean(np.abs(error)),
+            'R2': (
+                1 - np.sum(error ** 2) /
+                np.sum((target - target.mean()) ** 2)
+                if np.sum((target - target.mean()) ** 2) > 0
+                else np.nan),
+            'Mean Bias': np.mean(error)}
+        
+        # RMSE for each bus.
+        for bus in range(targets.shape[1]):
+            mask = evaluation_mask[:, bus, i]
+
+            if mask.any():
+                bus_rmse[bus, i] = np.sqrt(
+                    np.mean(
+                        (preds[:, bus, i][mask] -
+                         targets[:, bus, i][mask]) ** 2))
+                
+    results = {
+        'preds': preds,
+        'targets': targets,
+        'Y_labels': var_names,
+        'metrics': metrics,
+        'bus_rmse': bus_rmse,
+        'metrics_labels': np.array(
+            ['P_RMSE', 'V_RMSE', 'Q_RMSE', 'Theta_RMSE']),
+        'per_unit': per_unit,
+        'bases': bases}
+    
+    np.save(results_filepath, results, allow_pickle=True)
