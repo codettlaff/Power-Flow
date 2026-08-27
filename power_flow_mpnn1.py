@@ -283,18 +283,44 @@ def convert_to_absolute(data, bases):
     data[..., 2] *= S_base  # Q
     return data
 
-def predict(model, dataset, batch_size=32, device='cpu'):
+def predict(
+        model,
+        dataset,
+        batch_size=32,
+        device='cpu',
+        loss_weights=[1, 1, 1, 1]):
+    
     model = model.to(device).eval()
     X = dataset['X']
     Y = dataset['Y']
     edge_index = torch.tensor(dataset['edge_index'], dtype=torch.long).to(device)
     edge_attr = torch.tensor(dataset['edge_attr'], dtype=torch.float32).to(device)
+    
+    masks = X[:, :, 4:8]
+    weights = torch.tensor(loss_weights, dtype=torch.float32).to(device)
+    
     preds = []
+    total_loss = 0.0
+    total_batches = 0
+    
     with torch.no_grad():
         for i in range(0, len(X), batch_size):
-            x = torch.tensor(X[i:i+batch_size], dtype=torch.float32).to(device)
-            preds.append(model(x, edge_index, edge_attr).cpu().numpy())
-    return np.concatenate(preds), Y
+            x = X[i: i + batch_size].to(device)
+            y = Y[i: i + batch_size].to(device)
+            mask = masks[i: i + batch_size].to(device)
+            
+            pred = model(x, edge_index, edge_attr)
+            preds.append(pred.cpu().numpy())
+            
+            unknown = 1 - mask,
+            loss = ((pred - y) ** 2 * unknown * weights).sum()
+            loss /= (unknown * weights).sum()
+            
+            total_loss += loss.item()
+            total_batches += 1
+            
+    testing_loss = total_loss / total_batches
+    return np.concatenate(preds), Y.numpy(), testing_loss
 
 def test_model(
         model,
@@ -305,7 +331,7 @@ def test_model(
         device='cpu',
         include_knowns=True):
     
-    preds, targets = predict(model, test_dataset, batch_size, device)
+    preds, targets, testing_loss = predict(model, test_dataset, batch_size, device)
     
     # Convert units if necessary
     bases = test_dataset['bases']
