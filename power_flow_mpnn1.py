@@ -416,33 +416,44 @@ if __name__ == '__main__':
     results_folderpath = os.path.join(results_dir, '32sample')
     os.makedirs(results_folderpath, exist_ok=True)
     results_filepath = os.path.join(results_folderpath, 'case14_results.npy')
+    loss_history_filepath = os.path.join(results_folderpath, 'loss_history.npy')
     
     train_data = np.load(train_data_filepath, allow_pickle=True).item()
     test_data = np.load(test_data_filepath, allow_pickle=True).item()
     
+    # Make sure data is in per_unit, test conversion
+    test_conversion = False
+    if test_conversion:
+        per_unit = test_data['per_unit']
+        Y, bases = test_data['Y'], test_data['bases']
+        Y_roundtrip = convert_to_per_unit(convert_to_absolute(Y,bases), bases)
+        error = np.max(np.abs(Y_roundtrip - Y))
+    
     # Model and Training Parameters
     num_layers = 5
     model = PowerFlowGNN(num_layers=num_layers)
-    epochs = 500
+    epochs = 100
     lr = 1e-3
     loss_weights = [1, 1, 1, 1]
     
     model = PowerFlowGNN(num_layers=num_layers)
     
-    train = False # already done
-    if train: loss_history = train_model(
-        model, 
-        train_data,
-        model_filepath,
-        epochs=epochs,
-        batch_size=32,
-        lr=lr,
-        device='cpu',
-        loss_weights=loss_weights)
+    train = True # already done
+    if train: 
+        loss_history = train_model(
+            model, 
+            train_data,
+            model_filepath,
+            epochs=epochs,
+            batch_size=32,
+            lr=lr,
+            device='cpu',
+            loss_weights=loss_weights)
+        np.save(loss_history_filepath, loss_history)
     
     model.load_state_dict(torch.load(model_filepath, weights_only=True))
-    
-    # plot_loss_history(loss_history)
+    loss_history = np.load(loss_history_filepath)
+    plot_loss_history(loss_history)
     
     preds, targets, testing_loss = predict(model, test_data, batch_size=32, device='cpu')
     
