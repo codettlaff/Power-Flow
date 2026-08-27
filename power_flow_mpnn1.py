@@ -348,6 +348,34 @@ def compute_metrics(preds, targets, mask):
         
     return metrics
 
+def compute_bus_metrics(preds, targets, mask):
+    
+    var_names = ['P', 'V', 'Q', 'Theta']
+    mask = ~mask
+    
+    bus_metrics = {}
+    for bus in range(preds.shape[1]):
+        metrics = {}
+        for i, name in enumerate(var_names):
+            valid = mask[:, bus, i]
+            if not valid.any(): continue
+            
+            pred = preds[:, bus, i][valid]
+            target = targets[:, bus, i][valid]
+            error = pred - target
+            bias = np.mean(error)
+            mse = np.mean(error ** 2)
+            denom = np.sum((target - target.mean()) ** 2)
+            if denom > 0: R2 = 1 - np.sum(error ** 2) / denom
+            else: R2 = np.nan
+            metrics[name] = {
+                'mse': mse,
+                'rmse': np.sqrt(mse),
+                'bias': bias,
+                'R2': R2}
+        bus_metrics[bus] = metrics
+    return bus_metrics
+
 def print_metrics(metrics):
     print(f"{'Variable':<10} {'MSE':>12} {'RMSE':>12} {'Bias':>12} {'R²':>12}")
     print("-" * 60)
@@ -497,14 +525,21 @@ if __name__ == '__main__':
     
     preds_pu, targets_pu, testing_loss = predict(model, test_data, batch_size=32, device='cpu')
     metrics_pu = compute_metrics(preds_pu, targets_pu, mask)
+    bus_metrics_pu = compute_bus_metrics(preds_pu, targets_pu, mask)
     
     preds_absolute = convert_to_absolute(preds_pu, bases)
     targets_absolute = convert_to_absolute(targets_pu, bases)
     metrics_absolute = compute_metrics(preds_absolute, targets_absolute, mask)
+    bus_metrics_absolute = compute_bus_metrics(preds_pu, targets_pu, mask)
     
     print('Per-Unit Metrics:\n')
     print_metrics(metrics_pu)
     print('Absolute Metrics:\n')
     print_metrics(metrics_absolute)
+    
+    print('Per-Unit Slack-Bus Metrics:\n')
+    print_metrics(bus_metrics_pu[0])
+    print('Absolute Slack-Bus Metrics:\n')
+    print_metrics(bus_metrics_absolute[0])
     
     print('')
