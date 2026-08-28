@@ -253,7 +253,6 @@ def convert_to_per_unit(data, bases):
 
     return data
 
-
 def convert_to_absolute(data, bases):
     S_base = bases['S_base']
     V_base = bases['V_base']
@@ -329,10 +328,11 @@ if __name__ == '__main__':
     os.makedirs(data_dir, exist_ok=True)
     
     max_load_net_filepath = os.path.join(data_dir, 'case14_max_load_net.p')
-    train_data_filepath = os.path.join(data_dir, 'case14_train1.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_test1.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_32sample_train.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_32sample_test.npy')
     
-    n_samples = int(5e4) # 50,000 samples
+    # n_samples = int(5e4) # 50,000 samples
+    n_samples = 32 # Overfitting test
     load_scale_factor = (0.8, 1.2)
     gen_power_scale_factor = (0.8, 1.2)
     gen_voltage_scale_factor = (0.99, 1.01)
