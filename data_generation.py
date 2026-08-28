@@ -351,14 +351,16 @@ if __name__ == '__main__':
     os.makedirs(data_dir, exist_ok=True)
     
     max_load_net_filepath = os.path.join(data_dir, 'case14_max_load_net.p')
-    train_data_filepath = os.path.join(data_dir, 'case14_32sample_train.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_32sample_test.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_100sample_train.npy')
+    val_data_filepath = os.path.join(data_dir, 'case14_100sample_val.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_100sample_test.npy')
     
     # n_samples = int(5e4) # 50,000 samples
-    n_samples = 32 # Overfitting test
+    n_samples = 100
     load_scale_factor = (0.8, 1.2)
     gen_power_scale_factor = (0.8, 1.2)
     gen_voltage_scale_factor = (0.99, 1.01)
+    dataset_split = (0.7, 0.15, 0.15)
     
     get_max_load_net = False # Done
     
@@ -380,8 +382,9 @@ if __name__ == '__main__':
         perturb_generator_voltages=True,
         gen_voltages_scale_factor=gen_voltage_scale_factor)
         
-    train_data, test_data = train_test_split(dataset)
+    train_data, val_data, test_data = train_val_test_split(dataset, dataset_split)
     
     np.save(train_data_filepath, train_data, allow_pickle=True)
+    np.save(val_data_filepath, val_data, allow_pickle=True)
     np.save(test_data_filepath, test_data, allow_pickle=True)
         
