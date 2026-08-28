@@ -6,6 +6,7 @@ Created on Wed Aug 26 14:54:48 2026
 """
 
 import os
+import copy
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -21,6 +22,8 @@ import torch.nn as nn
 # what does scatter_add do?
 # what does the encoder that turns the node features into the hidden representation do?
 # how exactly does nn.ModuleList work?
+
+# if the masks are used to determine which variables contribute to loss, is it necessary to inlcude them as inputs to the model?
 
 class PowerFlowMPNN(nn.Module):
     
@@ -219,6 +222,109 @@ class PowerFlowGNN(nn.Module):
         return output
     
 def train_model(
+        model,
+        train_dataset,
+        val_dataset=None,
+        save_filepath=None,
+        epochs=10,
+        batch_size=32,
+        lr=1e-3,
+        device='cpu',
+        loss_weights=(1, 1, 1, 1),
+        early_stopping=False,
+        patience=20):
+    
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    
+    # Training data
+    X_train = torch.tensor(train_dataset['X'], dtype=torch.float32)
+    Y_train = torch.tensor(train_dataset['Y'], dtype=torch.float32)
+    train_mask = X_train[:, :, 4:8]
+    
+    # Validation data
+    if early_stopping and val_dataset:
+        X_val = torch.tensor(val_dataset['X'], dtype=torch.float32)
+        Y_val = torch.tensor(val_dataset['Y'], dtype=torch.float32)
+        val_mask = X_val[:, :, 4:8]
+        
+    # Graph data
+    edge_index = torch.tensor(train_dataset['edge_index'], dtype=torch.float32).to(device)
+    edge_attr = torch.tensor(train_dataset['edge_attr'], dtype=torch.float32).to(device)
+    
+    # Loss weights
+    weights = torch.tensor(loss_weights, dtype=torch.float32).to(device)
+    
+    loss_history = []
+    val_loss_history = []
+    best_val_loss = float('inf')
+    patience_counter = 0
+    
+    for epoch in range(epochs):
+        
+        # Training
+        model.train()
+        
+        indices = torch.randperm(len(X_train))
+        epoch_loss = 0.0
+        num_batches = 0
+        
+        for start in tqdm(range(0, len(X_train), batch_size), desc=f'Epoch {epoch + 1}/{epochs}'):
+            idx = indices[start : start + batch_size]
+            x = X_train[idx].to(device)
+            y = Y_train[idx].to(device)
+            mask = train_mask[idx].to(device)
+            
+            optimizer.zero_grad()
+            pred = model(x, edge_index, edge_attr)
+            
+            # Compute weighted MSE only for unknown variables.
+            unknown = 1 - mask
+            loss = ((pred - y) ** 2 * unknown * weights).sum()
+            loss /= (unknown * weights).sum()
+            
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+            num_batches += 1 
+        
+        # Average training loss across batches
+        epoch_loss /= num_batches
+        loss_history.append(epoch_loss)
+        
+        # Validation
+        # Only validate batch-by-batch is dataset becomes so large it causes a memory issue.
+        if early_stopping:
+            model.eval()
+            
+            with torch.no_grad():
+                val_pred = model(X_val.to(device), edge_index, edge_attr)
+                val_unknown = 1 - val_mask.to(device)
+                val_loss = ((val_pred - Y_val.to(device)) ** 2 * val_unknown * weights).sum()
+                val_loss /= (val_unknown * weights).sum()
+                
+            val_loss = val_loss.item()
+            val_loss_history.append(val_loss)
+            
+            # Check for improvement
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_state = copy.deepcopy(model.state_dict()) # Save best model
+                patience_counter = 0
+            else: patience_counter += 1
+            
+            # Early stopping
+            if patience_counter >= patience:
+                break
+            
+    model.load_state_dict(best_state)
+    if save_filepath: torch.save(model.state_dict(), save_filepath)
+    
+    if early_stopping and val_dataset: return loss_history, val_loss_history
+    else: return loss_history
+            
+    
+def train_model_old(
         model,
         dataset,
         save_filepath,
@@ -456,7 +562,12 @@ if __name__ == '__main__':
     
     model = PowerFlowGNN(num_layers=num_layers)
     
-    train = False # already done
+    P_loss_weights = [1, 0, 0, 0]
+    V_loss_weights = [0, 1, 0, 0]
+    Q_loss_weights = [0, 0, 1, 0]
+    Theta_loss_weights = [0, 0, 0, 1]
+    
+    train = True # already done
     if train: 
         loss_history = train_model(
             model, 
@@ -466,12 +577,12 @@ if __name__ == '__main__':
             batch_size=32,
             lr=lr,
             device='cpu',
-            loss_weights=loss_weights)
+            loss_weights=Theta_loss_weights)
         np.save(loss_history_filepath, loss_history)
     
     model.load_state_dict(torch.load(model_filepath, weights_only=True))
-    # loss_history = np.load(loss_history_filepath)
-    # plot_loss_history(loss_history)
+    loss_history = np.load(loss_history_filepath)
+    plot_loss_history(loss_history)
     
     mask = test_data['X'][:, :, 4:8].astype(bool)
     bases = test_data['bases']
@@ -495,6 +606,6 @@ if __name__ == '__main__':
     print('Absolute Slack-Bus Metrics:\n')
     print_metrics(bus_metrics_absolute[0])
     
-    plot_bus_metrics(bus_metrics_pu)
+    plot_bus_metrics(bus_metrics_absolute)
     
     print('')
