@@ -224,8 +224,8 @@ class PowerFlowGNN(nn.Module):
 def train_model(
         model,
         train_dataset,
+        save_filepath,
         val_dataset=None,
-        save_filepath=None,
         epochs=10,
         batch_size=32,
         lr=1e-3,
@@ -249,7 +249,7 @@ def train_model(
         val_mask = X_val[:, :, 4:8]
         
     # Graph data
-    edge_index = torch.tensor(train_dataset['edge_index'], dtype=torch.float32).to(device)
+    edge_index = torch.tensor(train_dataset['edge_index'], dtype=torch.long).to(device)
     edge_attr = torch.tensor(train_dataset['edge_attr'], dtype=torch.float32).to(device)
     
     # Loss weights
@@ -318,11 +318,10 @@ def train_model(
                 break
             
     model.load_state_dict(best_state)
-    if save_filepath: torch.save(model.state_dict(), save_filepath)
+    torch.save(model.state_dict(), save_filepath)
     
     if early_stopping and val_dataset: return loss_history, val_loss_history
-    else: return loss_history
-            
+    else: return loss_history            
     
 def train_model_old(
         model,
@@ -529,20 +528,23 @@ if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, 'data')
-    train_data_filepath = os.path.join(data_dir, 'case14_32sample_train.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_100sample_train.npy')
+    val_data_filepath = os.path.join(data_dir, 'case14_100sample_val.npy')
     test_data_filepath = os.path.join(data_dir, 'case14_32sample_test.npy')
     
     models_dir = os.path.join(base_dir, 'models')
     os.makedirs(models_dir, exist_ok=True)
-    model_filepath = os.path.join(models_dir, '32_sample_mdl.npy')
+    model_filepath = os.path.join(models_dir, '100_sample_mdl.npy')
     
     results_dir = os.path.join(base_dir, 'results')
-    results_folderpath = os.path.join(results_dir, '32sample')
+    results_folderpath = os.path.join(results_dir, '100sample')
     os.makedirs(results_folderpath, exist_ok=True)
     results_filepath = os.path.join(results_folderpath, 'case14_results.npy')
-    loss_history_filepath = os.path.join(results_folderpath, 'loss_history.npy')
+    train_loss_history_filepath = os.path.join(results_folderpath, 'train_loss_history.npy')
+    val_loss_history_filepath = os.path.join(results_folderpath, 'val_loss_history.npy')
     
     train_data = np.load(train_data_filepath, allow_pickle=True).item()
+    val_data = np.load(val_data_filepath, allow_pickle=True).item()
     test_data = np.load(test_data_filepath, allow_pickle=True).item()
     
     # Make sure data is in per_unit, test conversion
@@ -569,20 +571,25 @@ if __name__ == '__main__':
     
     train = True # already done
     if train: 
-        loss_history = train_model(
+        train_loss_history, val_loss_history = train_model(
             model, 
             train_data,
             model_filepath,
+            early_stopping=True,
+            val_dataset=val_data,
             epochs=epochs,
             batch_size=32,
             lr=lr,
             device='cpu',
             loss_weights=Theta_loss_weights)
-        np.save(loss_history_filepath, loss_history)
+        np.save(train_loss_history_filepath, train_loss_history)
+        np.save(val_loss_history_filepath, val_loss_history)
     
     model.load_state_dict(torch.load(model_filepath, weights_only=True))
-    loss_history = np.load(loss_history_filepath)
-    plot_loss_history(loss_history)
+    train_loss_history = np.load(train_loss_history_filepath)
+    val_loss_history = np.load(val_loss_history_filepath)
+    plot_loss_history(train_loss_history)
+    plot_loss_history(val_loss_history_filepath)
     
     mask = test_data['X'][:, :, 4:8].astype(bool)
     bases = test_data['bases']
