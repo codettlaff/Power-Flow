@@ -388,75 +388,6 @@ def print_metrics(metrics):
             f"{values['bias']:>12.6f} "
             f"{values['R2']:>12.6f}"
         )
-
-def test_model(
-        model,
-        test_dataset,
-        results_filepath,
-        per_unit=False,
-        batch_size=32,
-        device='cpu',
-        include_knowns=True):
-    
-    preds, targets, testing_loss = predict(model, test_dataset, batch_size, device)
-    
-    # Convert units if necessary
-    bases = test_dataset['bases']
-    if test_dataset['per_unit'] != per_unit:
-        convert = convert_to_per_unit if per_unit else convert_to_absolute 
-        preds = convert(preds, bases)
-        targets = convert(targets, bases)
-        
-    var_names = np.array(['P', 'V', 'Q', 'Theta'])
-    masks = test_dataset['X'][:, :, 4:8].astype(bool)
-    evaluation_mask = (
-        np.ones_like(masks, dtype=bool)
-        if include_knowns else ~masks)
-    
-    metrics = {}
-    bus_rmse = np.full((targets.shape[1], 4), np.nan)
-    
-    for i, name in enumerate(var_names):
-        
-        pred = preds[:, :, i][evaluation_mask[:, :, i]]
-        target = targets[:, :, i][evaluation_mask[:, :, i]]
-
-        error = pred - target
-        mse = np.mean(error ** 2)
-        
-        metrics[name] = {
-            'MSE': mse,
-            'RMSE': np.sqrt(mse),
-            'MAE': np.mean(np.abs(error)),
-            'R2': (
-                1 - np.sum(error ** 2) /
-                np.sum((target - target.mean()) ** 2)
-                if np.sum((target - target.mean()) ** 2) > 0
-                else np.nan),
-            'Mean Bias': np.mean(error)}
-        
-        # RMSE for each bus.
-        for bus in range(targets.shape[1]):
-            mask = evaluation_mask[:, bus, i]
-
-            if mask.any():
-                bus_rmse[bus, i] = np.sqrt(
-                    np.mean(
-                        (preds[:, bus, i][mask] -
-                         targets[:, bus, i][mask]) ** 2))
-                
-    results = {
-        'preds': preds,
-        'targets': targets,
-        'Y_labels': var_names,
-        'metrics': metrics,
-        'bus_rmse': bus_rmse,
-        'metrics_labels': np.array(
-            ['P_RMSE', 'V_RMSE', 'Q_RMSE', 'Theta_RMSE']),
-        'per_unit': per_unit,
-        'bases': bases}
-    
-    np.save(results_filepath, results, allow_pickle=True)
     
 def plot_loss_history(loss_history):
     plt.plot(loss_history)
@@ -469,22 +400,22 @@ def plot_loss_history(loss_history):
 def plot_bus_metrics(bus_metrics):
     variables = ['P', 'V', 'Q', 'Theta']
     metrics = ['mse', 'rmse', 'bias', 'R2']
-
-    bus_indices = sorted(bus_metrics.keys())
-
+    
     for variable in variables:
         for metric in metrics:
+            valid_buses = [
+                bus for bus in sorted(bus_metrics)
+                if variable in bus_metrics[bus]
+                and metric in bus_metrics[bus][variable]]
             values = [
-                bus_metrics[bus].get(variable, {}).get(metric, np.nan)
-                for bus in bus_indices
-            ]
-
+                bus_metrics[bus][variable][metric]
+                for bus in valid_buses]
             plt.figure()
-            plt.bar(bus_indices, values)
+            plt.bar(valid_buses, values)
             plt.xlabel('Bus Index')
             plt.ylabel(metric.upper())
             plt.title(f'{variable} {metric.upper()} by Bus')
-            plt.xticks(bus_indices)
+            plt.xticks(valid_buses)
             plt.grid(axis='y')
             plt.show()
     
@@ -564,6 +495,6 @@ if __name__ == '__main__':
     print('Absolute Slack-Bus Metrics:\n')
     print_metrics(bus_metrics_absolute[0])
     
-    plot_bus_metrics(bus_metrics_absolute)
+    plot_bus_metrics(bus_metrics_pu)
     
     print('')
