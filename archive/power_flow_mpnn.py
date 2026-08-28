@@ -206,7 +206,7 @@ def test_model(
     
     var_names = np.array(['P', 'V', 'Q', 'Theta'])
     masks = test_dataset['X'][:, :, 4:8].astype(bool)
-    unknown = masks if not include_knowns else np.ones_like(masks, dtype=bool)
+    unknown = ~masks if not include_knowns else np.ones_like(masks, dtype=bool)
         
     metrics = {}
     bus_metrics = np.full((targets.shape[1], 4), np.nan)
@@ -359,7 +359,7 @@ if __name__ == '__main__':
     train_data = np.load(train_data_filepath, allow_pickle=True).item()
     test_data = np.load(test_data_filepath, allow_pickle=True).item()
     
-    num_layers = 1
+    num_layers = 5
     model = PowerFlowGNN(num_layers=num_layers)
     save_filepath = 'case14_model1.pth'
     epochs = 10
@@ -369,17 +369,15 @@ if __name__ == '__main__':
     # train_model(model, train_data, save_filepath)
     model.load_state_dict(torch.load(save_filepath, weights_only=True))
     
-    test_model(model, test_data, results_filepath, per_unit=False, include_knowns=False)
+    # test_model(model, test_data, results_filepath, per_unit=False, include_knowns=False)
     results = np.load(results_filepath, allow_pickle=True).item()
     
-    # print_metrics(results['metrics'])
+    # plot_bus_metrics(results['bus_rmse'], results['metrics_labels'])
     
-    # plot_bus_metrics(results['bus_metrics'], results['metrics_labels'])
+    plot_distributions(results['targets'], results['preds'],['P', 'Q'], bus=4)
     
-    plot_distributions(results['targets'], results['preds'],['P', 'V', 'Q', 'Theta'], bus=1)
+    #plot_scatterplots(results['targets'], results['preds'], ['P', 'Q'], [1])
     
-    plot_scatterplots(results['targets'], results['preds'], ['P', 'Q'], [1])
-    
-    plot_pred_vs_true(results['targets'], results['preds'], ['P', 'Q'], [1])
+    plot_pred_vs_true(results['targets'], results['preds'], ['P', 'Q'], [4])
     
     print('')
