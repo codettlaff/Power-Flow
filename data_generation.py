@@ -321,6 +321,29 @@ def train_test_split(dataset, train_ratio=0.8):
     
     return train, test
 
+def train_val_test_split(dataset, train_val_test_split=(0.7,0.15,0.15)):
+    n = len(dataset['X'])
+    indices = list(range(n))
+    random.shuffle(indices)
+    
+    train_ratio, val_ratio, test_ratio = train_val_test_split
+    train_end = int(train_ratio * n)
+    val_end = train_end + int(val_ratio * n)
+    
+    train = {
+        k: v[indices[:train_end]] if k in ['X', 'Y'] else v
+        for k, v in dataset.items()}
+    
+    val = {
+        k: v[indices[:train_end]] if k in ['X', 'Y'] else v
+        for k, v in dataset.items()}
+    
+    test = {
+        k: v[indices[val_end:]] if k in ['X', 'Y'] else v
+        for k, v in dataset.items()}
+    
+    return train, val, test
+
 if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
