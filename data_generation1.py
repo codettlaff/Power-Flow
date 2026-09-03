@@ -52,13 +52,12 @@ PER_UNIT = True
 def get_case(case):
     """Return a fresh PandaPower network for the requested test case."""
     if case == '14':
-        return pn.case14()
+        net = pn.case14()
     if case == '118':
-        return pn.case118()
+        net = pn.case118()
     if case == '6470rte':
-        return pn.case6470rte()
-    raise ValueError(f'Unsupported case: {case}')
-
+        net = pn.case6470rte()
+    return net
 
 def remove_c_nf(net):
     """Set line shunt capacitance to zero, as in PowerFlowNet."""
@@ -230,7 +229,6 @@ def perturb_network(net):
     """
 
     net = copy.deepcopy(net)
-    remove_c_nf(net)
 
     # Save nominal values before perturbing them
     r = net.line['r_ohm_per_km'].values.copy()
@@ -283,7 +281,7 @@ def perturb_network(net):
 # Sample construction
 # ---------------------------------------------------------------------------
 
-def create_sample(net, per_unit=True):
+def create_sample(net, init='flat', per_unit=True):
     """
     Generate one X/Y sample from a perturbed network.
 
@@ -300,13 +298,14 @@ def create_sample(net, per_unit=True):
         per_unit=True  -> [r_pu, x_pu]
         per_unit=False -> [r_ohm, x_ohm]
     """
+    
     net = perturb_network(net)
 
     # PowerFlowNet uses Newton-Raphson for the ground-truth solution.
     pp.runpp(
         net,
         algorithm='nr',
-        init='flat',
+        init=init,
         numba=False)
 
     S_base = float(net.sn_mva)
@@ -511,7 +510,14 @@ def create_dataset(
     Failed Newton-Raphson cases are discarded and generation continues until
     exactly n_samples successful cases have been collected.
     """
+
+    
+    base_net = copy.deepcopy(net)
+    remove_c_nf(base_net) # Remove line capacitance
     bases = get_system_bases(net)
+    
+    # Get Base Case solution for Warm Start
+    pp.runpp(base_net, algorithm='nr', init='flat', numba=False)
 
     X = []
     Y = []
@@ -526,7 +532,8 @@ def create_dataset(
 
             try:
                 x, y, edge_index, edge_attr = create_sample(
-                    net,
+                    base_net,
+                    init='results',
                     per_unit=per_unit)
             except pp.LoadflowNotConverged:
                 continue
