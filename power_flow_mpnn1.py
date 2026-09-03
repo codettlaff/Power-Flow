@@ -686,5 +686,376 @@ def train_model(
         return loss_history, val_loss_history
     return loss_history
         
+# Unit Conversion
+def convert_to_per_unit(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+
+    data = data.copy()
+
+    data[..., 0] /= S_base
+    data[..., 1] /= V_base
+    data[..., 2] /= S_base
+
+    return data
+
+
+def convert_to_absolute(data, bases):
+    S_base = bases['S_base']
+    V_base = bases['V_base']
+
+    data = data.copy()
+
+    data[..., 0] *= S_base
+    data[..., 1] *= V_base
+    data[..., 2] *= S_base
+
+    return data
+
+# Prediction
+
+def predict(
+    model,
+    dataset,
+    batch_size=32,
+    device='cpu',
+    loss_weights=[1, 1, 1, 1]):
+    
+    model = model.to(device).eval()
+    
+    X = torch.tensor(
+        dataset['X'],
+        dtype=torch.float32)
+    
+    Y = torch.tensor(
+        dataset['Y'],
+        dtype=torch.float32)
+    
+    edge_index = torch.tensor(
+        dataset['edge_index'],
+        dtype=torch.long).to(device)
+    
+    edge_attr = torch.tensor(
+        dataset['edge_attr'],
+        dtype=torch.float32).to(device)
+    
+    masks = X[:, :, 4:8]
+    
+    weights = torch.tensor(
+        loss_weights,
+        dtype=torch.float32,
+        device=device).view(1, 1, 4)
+    
+    preds = []
+    total_loss = 0.0
+    total_batches = 0
+    
+    with torch.no_grad():
+        
+        for i in range(0, len(X), batch_size):
             
-                                                
+            x = X[i:i + batch_size].to(device)
+            y = Y[i:i + batch_size].to(device)
+            mask = masks[i:i + batch_size].to(device)
+            
+            pred = model(
+                x, 
+                edge_index,
+                edge_attr)
+            
+            preds.append(pred.cpu().numpy())
+            
+            # Testing loss: unknown variables only
+            unknown = (1.0 - mask).float()
+            
+            loss = ((pred - y)**2 * unknown * weights).sum()
+            loss /= (unknown * weights).sum()
+            
+            total_loss += loss.item()
+            total_batches += 1
+            
+    testing_loss = total_loss / total_batches
+    
+    return (
+        np.concatenate(preds),
+        Y.numpy(),
+        testing_loss)
+
+# Metrics
+def compute_metrics(preds, targets, mask):
+    
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
+    mask = ~ mask
+    metrics = {}
+    
+    for i, name in enumerate(var_names):
+        
+        pred = preds[:, :, i][mask[:, :, i]]
+        target = targets[:, :, i][mask[:, :, i]]
+        
+        error = pred - target
+        bias = np.mean(error)
+        mse = np.mean(error ** 2)
+        
+        denom = np.sum((target - target.mean()) ** 2)
+        if denom > 0: R2 = (1 - np.sum(error ** 2) / denom)
+        else: R2 = np.nan
+        
+        metrics[name] = {
+            'mse': mse,
+            'rmse': np.sqrt(mse),
+            'bias': bias,
+            'R2': R2}
+        
+    return metrics
+
+def compute_bus_metrics(preds, targets, mask):
+    
+    var_names = ['P', 'V', 'Q', 'Theta']
+    mask = ~ mask
+    bus_metrics = {}
+    
+    for bus in range(preds.shape[1]):
+        
+        metrics = {}
+        for i, name in enumerate(var_names):
+            
+            valid = mask[:, bus, i]
+            if not valid.any(): continue
+            
+            pred = preds[:, bus, i][valid]
+            target = targets[:, bus, i][valid]
+            
+            error = pred - target
+            bias = np.mean(error)
+            mse = np.mean(error ** 2)
+            
+            denom = np.sum((target - target.mean()) ** 2)
+            
+            if denom > 0: R2 = (1 - np.sum(error ** 2) / denom)
+            else: R2 = np.nan
+            
+            metrics[name] = {
+                'mse': mse,
+                'rmse': np.sqrt(mse),
+                'bias': bias,
+                'R2': R2}
+            
+        bus_metrics[bus] = metrics
+    return bus_metrics
+
+
+def print_metrics(metrics):
+
+    print(
+        f"{'Variable':<10} "
+        f"{'MSE':>12} "
+        f"{'RMSE':>12} "
+        f"{'Bias':>12} "
+        f"{'R²':>12}")
+
+    print("-" * 60)
+
+    for name, values in metrics.items():
+
+        print(
+            f"{name:<10} "
+            f"{values['mse']:>12.6f} "
+            f"{values['rmse']:>12.6f} "
+            f"{values['bias']:>12.6f} "
+            f"{values['R2']:>12.6f}")
+
+# Plotting
+def plot_loss_history(loss_history):
+
+    plt.plot(loss_history)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss')
+    plt.grid(True)
+    plt.show()
+    
+def plot_bus_metrics(bus_metrics):
+
+    variables = [
+        'P',
+        'V',
+        'Q',
+        'Theta']
+
+    metrics = [
+        'mse',
+        'rmse',
+        'bias',
+        'R2']
+
+    for variable in variables:
+
+        for metric in metrics:
+
+            valid_buses = [
+                bus
+                for bus in sorted(bus_metrics)
+                if variable in bus_metrics[bus]
+                and metric in bus_metrics[bus][variable]]
+
+            values = [
+                bus_metrics[bus][variable][metric]
+                for bus in valid_buses]
+
+            plt.figure()
+            plt.bar(valid_buses, values)
+            plt.xlabel('Bus Index')
+            plt.ylabel(metric.upper())
+            plt.title(f'{variable} {metric.upper()} by Bus')
+            plt.xticks(valid_buses)
+            plt.grid(axis='y')
+            plt.show()
+
+# Main
+if __name__ == '__main__':
+    
+    base_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(base_dir, 'data')
+    
+    train_data_filepath = os.path.join(data_dir, 'case14_100sample_train.npy')
+    val_data_filepath = os.path.join(data_dir, 'case14_100sample_val.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_32sample_test.npy')
+    
+    models_dir = os.path.join(base_dir, 'models')
+    os.makedirs(models_dir, exist_ok=True)
+    model_filepath = os.path.join(models_dir, 'powerflownet_model.pt')
+    
+    results_dir = os.path.join(base_dir, 'results')
+    results_folderpath = os.path.join(results_dir, '100sample')
+    os.makedirs(results_folderpath, exist_ok=True)
+    results_filepath = os.path.join(results_folderpath, 'case14_results.npy')
+    
+    train_loss_history_filepath = os.path.join(results_folderpath, 'train_loss_history.npy')
+    val_loss_history_filepath = os.path.join(results_folderpath, 'val_loss_history.npy')
+    
+    train_data = np.load(train_data_filepath, allow_pickle=True).item()
+    val_data = np.load(val_data_filepath, allow_pickle=True).item()
+    test_data = np.load(test_data_filepath, allow_pickle=True).item()
+    
+    # Model and PowerFlowNet Configuration
+    hidden_dim = 128
+    num_layers = 4
+    K = 3 
+    dropout_rate = 0.2
+    
+    model = PowerFlowGNN(
+        in_dim=8,
+        hidden_dim=hidden_dim,
+        out_dim=4,
+        edge_dim=2,
+        num_layers=num_layers,
+        K=K,
+        dropout_rate=dropout_rate)
+    
+    # PowerFlowNet standard training settings:
+    # AdamW, lr=0.001, OneCycleLR, batch size=128, MSE loss.
+    epochs = 1000
+    batch_size = 128
+    lr = 1e-3
+    loss_weights = [1, 1, 1, 1]
+    
+    # PowerFlowNet Paper MSE training objective uses Knowns
+    unknown_only = False
+    
+    train = True
+    if train:
+        train_loss_history, val_loss_history = train_model(
+            model,
+            train_data,
+            model_filepath,
+            val_dataset=val_data,
+            early_stopping=True,
+            patience=20,
+            epochs=epochs,
+            batch_size=batch_size,
+            lr=lr,
+            device='cpu',
+            loss_weights=loss_weights,
+            unknown_only=unknown_only,
+            use_one_cycle=True)
+        
+        np.save(
+            train_loss_history_filepath,
+            train_loss_history)
+        
+        np.save(
+            val_loss_history_filepath,
+            val_loss_history)
+        
+    # Load trained model
+    model.load_state_dict(
+        torch.load(
+            model_filepath,
+            weights_only=True))
+    
+    train_loss_history = np.load(
+        train_loss_history_filepath)
+    
+    val_loss_history = np.load(
+        val_loss_history_filepath)
+    
+    plot_loss_history(
+        train_loss_history)
+    
+    plot_loss_history(
+        val_loss_history)
+    
+    # Test Model
+    mask = test_data['X'][:, :, 4:8].astype(bool)
+    bases = test_data['bases']
+    
+    preds_pu, targets_pu, testing_loss = predict(
+        model,
+        test_data, 
+        batch_size=32,
+        device='cpu')
+    
+    metrics_pu = compute_metrics(
+        preds_pu,
+        targets_pu,
+        mask)
+    
+    bus_metrics_pu = compute_bus_metrics(
+        preds_pu,
+        targets_pu,
+        mask)
+
+    preds_absolute = convert_to_absolute(
+        preds_pu,
+        bases)
+
+    targets_absolute = convert_to_absolute(
+        targets_pu,
+        bases)
+
+    metrics_absolute = compute_metrics(
+        preds_absolute,
+        targets_absolute,
+        mask)
+
+    bus_metrics_absolute = compute_bus_metrics(
+        preds_absolute,
+        targets_absolute,
+        mask)
+    
+    print('Per-Unit Metrics:\n')
+    print_metrics(metrics_pu)
+
+    print('Absolute Metrics:\n')
+    print_metrics(metrics_absolute)
+
+    print('Per-Unit Slack-Bus Metrics:\n')
+    print_metrics(bus_metrics_pu[0])
+
+    print('Absolute Slack-Bus Metrics:\n')
+    print_metrics(bus_metrics_absolute[0])
+
+    plot_bus_metrics(bus_metrics_absolute)
+
+    print('')
