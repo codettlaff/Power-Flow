@@ -38,8 +38,7 @@ import pandapower.networks as pn
 
 # Configuration
 
-# N_SAMPLES = 20000
-N_SAMPLES = 32
+N_SAMPLES = 20000
 LINE_SCALE = (0.8, 1.2)
 GEN_VOLTAGE_RANGE = (1.00, 1.05)
 GEN_POWER_STD = 0.10
@@ -566,16 +565,18 @@ def create_dataset(
     }
 
 
-def train_test_split(dataset, train_ratio=TRAIN_RATIO):
-    """Randomly split X, Y, and per-sample edge_attr into train/test sets."""
+def train_val_test_split(dataset, train_val_test_split=(0.7, 0.15, 0.15)):
+    """Randomly split X, Y, and per-sample edge_attr into train/validation/test sets."""
     n = len(dataset['X'])
     indices = list(range(n))
     random.shuffle(indices)
 
-    split = int(train_ratio * n)
+    train_end = int(train_val_test_split[0] * n)
+    val_end = train_end + int(train_val_test_split[1] * n)
 
-    train_indices = indices[:split]
-    test_indices = indices[split:]
+    train_indices = indices[:train_end]
+    val_indices = indices[train_end:val_end]
+    test_indices = indices[val_end:]
 
     sample_fields = ['X', 'Y', 'edge_attr']
 
@@ -584,13 +585,17 @@ def train_test_split(dataset, train_ratio=TRAIN_RATIO):
         for k, v in dataset.items()
     }
 
+    val = {
+        k: v[val_indices] if k in sample_fields else v
+        for k, v in dataset.items()
+    }
+
     test = {
         k: v[test_indices] if k in sample_fields else v
         for k, v in dataset.items()
     }
 
-    return train, test
-
+    return train, val, test
 
 # ---------------------------------------------------------------------------
 # Main
@@ -601,7 +606,7 @@ if __name__ == '__main__':
     # Configuration
     CASE = '14'
     SAMPLES = N_SAMPLES
-    TRAIN_RATIO = 0.8
+    TRAIN_VAL_TEST_SPLIT = (0.7, 0.15, 0.15)
     PER_UNIT = True
 
     print(f'Generating {SAMPLES} samples')
@@ -618,9 +623,11 @@ if __name__ == '__main__':
     os.makedirs(data_dir, exist_ok=True)
 
     train_data_filepath = os.path.join(
-        data_dir, f'case{CASE}_PowerFlowNet_train.npy')
+        data_dir, f'case{CASE}_PowerFlowNet_{SAMPLES}samples_train.npy')
+    val_data_filepath = os.path.join(
+        data_dir, f'case{CASE}_PowerFlowNet_{SAMPLES}samples_val.npy')
     test_data_filepath = os.path.join(
-        data_dir, f'case{CASE}_PowerFlowNet_test.npy')
+        data_dir, f'case{CASE}_PowerFlowNet_{SAMPLES}samples_test.npy')
 
     net = get_case(CASE)
 
@@ -629,11 +636,12 @@ if __name__ == '__main__':
         SAMPLES,
         per_unit=PER_UNIT)
 
-    train_data, test_data = train_test_split(
+    train_data, val_data, test_data = train_val_test_split(
         dataset,
-        train_ratio=TRAIN_RATIO)
+        train_val_test_split)
 
     np.save(train_data_filepath, train_data, allow_pickle=True)
+    np.save(val_data_filepath, val_data, allow_pickle=True)
     np.save(test_data_filepath, test_data, allow_pickle=True)
 
     print('\nDataset generated successfully.')
@@ -644,4 +652,5 @@ if __name__ == '__main__':
     print(f'Train samples:    {len(train_data["X"])}')
     print(f'Test samples:     {len(test_data["X"])}')
     print(f'Saved train data: {train_data_filepath}')
+    print(f'Saved val data: {val_data_filepath}')
     print(f'Saved test data:  {test_data_filepath}')
