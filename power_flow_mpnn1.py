@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
-from torch.geometric.nn import TAGConv
+from torch_geometric.nn import TAGConv
 
 class PowerFlowMessageNetwork(nn.Module):
     """
@@ -65,30 +65,30 @@ class PowerFlowMessageNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, output_dim))
         
-        def forward(self, h, edge_index, edge_attr):
-            """
-            Compute one learned message for every directed edge.
-            Parameters:
-                h : size([batch, num_nodes, nfeature_dim]) : Node states
-                edge_index : size([2, num_edges]) : [from_node, to_node]
-                edge_attr : size([num_edges, efeature_dim]) : [r, x]
-            Returns:
-                messages : size([batch, num_edges, output_dim]) TODO: should this have hidden_dim?
-            """
-            
-            source = edge_index[0]
-            destination = edge_index[1]
-            
-            h_source = h[:, source, :]
-            h_destination = h[:, destination, :]
-            
-            edge_features = edge_attr.unsqueeze(0)
-            edge_features = edge_features.expand(h.size(0), -1, -1)
-            
-            # Construct input : [h_i, h_j, e_ij]
-            message_input = torch.cat([h_source, h_destination, edge_features], dim=-1)
-            
-            return self.netowork(message_input)
+    def forward(self, h, edge_index, edge_attr):
+        """
+        Compute one learned message for every directed edge.
+        Parameters:
+            h : size([batch, num_nodes, nfeature_dim]) : Node states
+            edge_index : size([2, num_edges]) : [from_node, to_node]
+            edge_attr : size([num_edges, efeature_dim]) : [r, x]
+        Returns:
+            messages : size([batch, num_edges, output_dim]) TODO: should this have hidden_dim?
+        """
+        
+        source = edge_index[0]
+        destination = edge_index[1]
+        
+        h_source = h[:, source, :]
+        h_destination = h[:, destination, :]
+        
+        edge_features = edge_attr.unsqueeze(0)
+        edge_features = edge_features.expand(h.size(0), -1, -1)
+        
+        # Construct input : [h_i, h_j, e_ij]
+        message_input = torch.cat([h_source, h_destination, edge_features], dim=-1)
+        
+        return self.network(message_input)
         
 class PowerFlowMessagePassing(nn.Module):
     """
@@ -111,26 +111,26 @@ class PowerFlowMessagePassing(nn.Module):
         """
         
         destination = edge_index[1]
+        batch_size = messages.size(0)
+        output_dim = messages.size(2)
         
         aggregated = torch.zeros(
-            messages.size(0),
+            batch_size,
             num_nodes,
-            self.output_dim,
+            output_dim,
             device = messages.device,
             dtype = messages.dtype)
         
-        aggregated.scatter_add_(
-            dim=-1,
-            index=destination
-                .view(1, -1, 1)
-                .expand_as(messages),
-            src=messages)
+        for node in range(num_nodes):
+            incoming = destination == node
+            if incoming.any():
+                aggregated[:, node, :] = (messages[:, incoming, :].sum(dim=1))
         
         return aggregated
     
-# TODO: This is still confusing.
-# The update network should fulfill the role of using the aggregated messages to update the node state.
-# Is that happeneing here?
+# PowerFlowNet replaces the update network with residual addition followed by TAGConv.
+# TAGConv is a graph convolution / update operation.
+# It takes the node states after the residual addition and propagates them over a larger neighborhood.
 class PowerFlowUpdateNetwork(nn.Module):
     """
     Update Network
@@ -301,6 +301,8 @@ class PowerFlowConv(nn.Module):
         h = self.dropout(h)
         return h
 
+# PowerFlowNet does not have a seperate Readout Neural Network
+# Instead it's just another esge-aware message passing layer.
 class PowerFlowReadoutNetwork(nn.Module):
     """
     Readout Network
@@ -322,7 +324,7 @@ class PowerFlowReadoutNetwork(nn.Module):
             hidden_dim = hidden_dim,
             output_dim = output_dim)
         
-        self.message_aggregation = PowerFlowMessagePassing(output = output_dim)
+        self.message_aggregation = PowerFlowMessagePassing(output_dim=output_dim)
         
     def forward(self, h, edge_index, edge_attr):
         """
@@ -360,11 +362,9 @@ class PowerFlowMaskEncoder(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, feature_dim))
         
-        def foward(self, mask):
-            return self.network(mask)
+    def forward(self, mask):
+        return self.network(mask)
         
-# TODO: confused why the message network and message aggregation are a part of the readout network.
-# TODO: shouldnt the readout network be a network not a layer?
 class PowerFlowGNN(nn.Module):
     """
     Architecture:
@@ -407,7 +407,7 @@ class PowerFlowGNN(nn.Module):
         
         # Mask Encoder
         self.mask_encoder = PowerFlowMaskEncoder(
-            feature_dim=self.feature_sim,
+            feature_dim=self.feature_dim,
             hidden_dim = hidden_dim)
         
         # Input Projection
@@ -920,7 +920,7 @@ if __name__ == '__main__':
     
     train_data_filepath = os.path.join(data_dir, 'case14_100sample_train.npy')
     val_data_filepath = os.path.join(data_dir, 'case14_100sample_val.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_32sample_test.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_100sample_test.npy')
     
     models_dir = os.path.join(base_dir, 'models')
     os.makedirs(models_dir, exist_ok=True)
