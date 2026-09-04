@@ -565,14 +565,14 @@ def create_dataset(
     }
 
 
-def train_val_test_split(dataset, train_val_test_split=(0.7, 0.15, 0.15)):
+def train_val_test_split(dataset, ratio=(0.7, 0.15, 0.15)):
     """Randomly split X, Y, and per-sample edge_attr into train/validation/test sets."""
     n = len(dataset['X'])
     indices = list(range(n))
     random.shuffle(indices)
 
-    train_end = int(train_val_test_split[0] * n)
-    val_end = train_end + int(train_val_test_split[1] * n)
+    train_end = int(ratio[0] * n)
+    val_end = train_end + int(ratio[1] * n)
 
     train_indices = indices[:train_end]
     val_indices = indices[train_end:val_end]
@@ -605,8 +605,8 @@ if __name__ == '__main__':
 
     # Configuration
     CASE = '14'
-    SAMPLES = N_SAMPLES
-    TRAIN_VAL_TEST_SPLIT = (0.7, 0.15, 0.15)
+    SAMPLES = 100
+    RATIO = (0.7, 0.15, 0.15)
     PER_UNIT = True
 
     print(f'Generating {SAMPLES} samples')
@@ -638,7 +638,7 @@ if __name__ == '__main__':
 
     train_data, val_data, test_data = train_val_test_split(
         dataset,
-        train_val_test_split)
+        RATIO)
 
     np.save(train_data_filepath, train_data, allow_pickle=True)
     np.save(val_data_filepath, val_data, allow_pickle=True)
