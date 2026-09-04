@@ -918,9 +918,9 @@ if __name__ == '__main__':
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, 'data')
     
-    train_data_filepath = os.path.join(data_dir, 'case14_100sample_train.npy')
-    val_data_filepath = os.path.join(data_dir, 'case14_100sample_val.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_100sample_test.npy')
+    train_data_filepath = os.path.join(data_dir, 'case14_20000sample_train.npy')
+    val_data_filepath = os.path.join(data_dir, 'case14_20000sample_val.npy')
+    test_data_filepath = os.path.join(data_dir, 'case14_20000sample_test.npy')
     
     models_dir = os.path.join(base_dir, 'models')
     os.makedirs(models_dir, exist_ok=True)
@@ -955,7 +955,7 @@ if __name__ == '__main__':
     
     # PowerFlowNet standard training settings:
     # AdamW, lr=0.001, OneCycleLR, batch size=128, MSE loss.
-    epochs = 1000
+    epochs = 500
     batch_size = 128
     lr = 1e-3
     loss_weights = [1, 1, 1, 1]
