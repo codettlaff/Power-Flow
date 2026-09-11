@@ -77,12 +77,8 @@ class PowerFlowMPNN(nn.Module):
         h_source = h[:, source, :]
         h_destination = h[:, destination, :]
         
-        # Add batch dimension to edge features
-        edge_features = edge_attr.unsqueeze(0)
-        edge_features = edge_features.expand(h.size(0), -1, -1)
-        
         # Combine source state, destination state, edge features
-        message_input = torch.cat([h_source, h_destination, edge_features], dim=-1)
+        message_input = torch.cat([h_source, h_destination, edge_attr], dim=-1)
         return self.message_net(message_input)
     
     def aggregate_messages(self, messages, edge_index, num_nodes):
@@ -275,8 +271,10 @@ def train_model(
             y = Y_train[idx].to(device)
             mask = train_mask[idx].to(device)
             
+            edge_attr_batch = edge_attr[idx].to(device)
+            
             optimizer.zero_grad()
-            pred = model(x, edge_index, edge_attr)
+            pred = model(x, edge_index, edge_attr_batch)
             
             # Compute weighted MSE only for unknown variables.
             unknown = 1 - mask
@@ -298,7 +296,8 @@ def train_model(
             model.eval()
             
             with torch.no_grad():
-                val_pred = model(X_val.to(device), edge_index, edge_attr)
+                val_edge_attr = torch.tensor(val_dataset['edge_attr'], dtype=torch.float32).to(device)
+                val_pred = model(X_val.to(device), edge_index, val_edge_attr)
                 val_unknown = 1 - val_mask.to(device)
                 val_loss = ((val_pred - Y_val.to(device)) ** 2 * val_unknown * weights).sum()
                 val_loss /= (val_unknown * weights).sum()
@@ -414,7 +413,9 @@ def predict(
             y = Y[i: i + batch_size].to(device)
             mask = masks[i: i + batch_size].to(device)
             
-            pred = model(x, edge_index, edge_attr)
+            edge_attr_batch = edge_attr[i:i + batch_size].to(device)
+            
+            pred = model(x, edge_index, edge_attr_batch)
             preds.append(pred.cpu().numpy())
             
             # Testing loss calculation
@@ -528,16 +529,20 @@ if __name__ == '__main__':
     
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, 'data')
-    train_data_filepath = os.path.join(data_dir, 'case14_100sample_train.npy')
-    val_data_filepath = os.path.join(data_dir, 'case14_100sample_val.npy')
-    test_data_filepath = os.path.join(data_dir, 'case14_32sample_test.npy')
+    
+    n_samples = 100
+    data_filename = f'case14_PowerFlowNet_{str(n_samples)}samples'
+    
+    train_data_filepath = os.path.join(data_dir, data_filename + '_train.npy')
+    val_data_filepath = os.path.join(data_dir, data_filename + '_val.npy')
+    test_data_filepath = os.path.join(data_dir, data_filename + '_test.npy')
     
     models_dir = os.path.join(base_dir, 'models')
     os.makedirs(models_dir, exist_ok=True)
-    model_filepath = os.path.join(models_dir, '100_sample_mdl.npy')
+    model_filepath = os.path.join(models_dir, f'{n_samples}sample_mdl.npy')
     
     results_dir = os.path.join(base_dir, 'results')
-    results_folderpath = os.path.join(results_dir, '100sample')
+    results_folderpath = os.path.join(results_dir, f'{n_samples}sample')
     os.makedirs(results_folderpath, exist_ok=True)
     results_filepath = os.path.join(results_folderpath, 'case14_results.npy')
     train_loss_history_filepath = os.path.join(results_folderpath, 'train_loss_history.npy')
