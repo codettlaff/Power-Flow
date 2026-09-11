@@ -430,7 +430,7 @@ def predict(
     testing_loss = total_loss / total_batches
     return np.concatenate(preds), Y.numpy(), testing_loss
 
-def compute_metrics(preds, targets, mask):
+def compute_metrics_old(preds, targets, mask):
     
     var_names = np.array(['P', 'V', 'Q', 'Theta'])
     mask = ~mask
@@ -454,6 +454,43 @@ def compute_metrics(preds, targets, mask):
         
     return metrics
 
+def compute_metrics(preds, targets, mask):
+    
+    var_names = np.array(['P', 'V', 'Q', 'Theta'])
+    mask = ~mask
+    
+    metrics = {}
+    for i, name in enumerate(var_names):
+        
+        pred = preds[:, :, i][mask[:, :, i]]
+        target = targets[:, :, i][mask[:, :, i]]
+        
+        error = pred - target
+        bias = np.mean(error)
+        mse = np.mean(error ** 2)
+        rmse = np.sqrt(mse)
+        
+        # Target standard deviation
+        target_std = np.std(target)
+        
+        # Standard deviation normalized RMSE
+        if target_std > 0: nrmse = rmse / target_std
+        else: nrmse = np.nan
+        
+        # R²
+        denom = np.sum((target - target.mean()) ** 2)
+        if denom > 0: R2 = 1 - np.sum(error ** 2) / denom
+        else: R2 = np.nan
+        
+        metrics[name] = {
+            'mse': mse,
+            'rmse': rmse,
+            'nrmse': nrmse,
+            'bias': bias,
+            'R2': R2}
+        
+    return metrics
+
 def compute_bus_metrics(preds, targets, mask):
     
     var_names = ['P', 'V', 'Q', 'Theta']
@@ -462,35 +499,57 @@ def compute_bus_metrics(preds, targets, mask):
     bus_metrics = {}
     for bus in range(preds.shape[1]):
         metrics = {}
+        
         for i, name in enumerate(var_names):
             valid = mask[:, bus, i]
-            if not valid.any(): continue
+            if not valid.any():
+                continue
             
             pred = preds[:, bus, i][valid]
             target = targets[:, bus, i][valid]
+            
             error = pred - target
             bias = np.mean(error)
             mse = np.mean(error ** 2)
+            rmse = np.sqrt(mse)
+            
+            # Target standard deviation
+            target_std = np.std(target)
+            
+            # Standard deviation normalized RMSE
+            if target_std > 0:
+                nrmse = rmse / target_std
+            else:
+                nrmse = np.nan
+            
+            # R²
             denom = np.sum((target - target.mean()) ** 2)
-            if denom > 0: R2 = 1 - np.sum(error ** 2) / denom
-            else: R2 = np.nan
+            if denom > 0:
+                R2 = 1 - np.sum(error ** 2) / denom
+            else:
+                R2 = np.nan
+            
             metrics[name] = {
                 'mse': mse,
-                'rmse': np.sqrt(mse),
+                'rmse': rmse,
+                'nrmse': nrmse,
                 'bias': bias,
                 'R2': R2}
+        
         bus_metrics[bus] = metrics
+    
     return bus_metrics
 
 def print_metrics(metrics):
-    print(f"{'Variable':<10} {'MSE':>12} {'RMSE':>12} {'Bias':>12} {'R²':>12}")
-    print("-" * 60)
+    print(f"{'Variable':<10} {'MSE':>12} {'RMSE':>12} {'NRMSE':>12} {'Bias':>12} {'R²':>12}")
+    print("-" * 80)
 
     for name, values in metrics.items():
         print(
             f"{name:<10} "
             f"{values['mse']:>12.6f} "
             f"{values['rmse']:>12.6f} "
+            f"{values['nrmse']:>12.6f} "
             f"{values['bias']:>12.6f} "
             f"{values['R2']:>12.6f}"
         )
@@ -505,7 +564,7 @@ def plot_loss_history(loss_history):
     
 def plot_bus_metrics(bus_metrics):
     variables = ['P', 'V', 'Q', 'Theta']
-    metrics = ['mse', 'rmse', 'bias', 'R2']
+    metrics = ['mse', 'rmse', 'nrmse', 'bias', 'R2']
     
     for variable in variables:
         for metric in metrics:
@@ -569,6 +628,7 @@ if __name__ == '__main__':
     
     model = PowerFlowGNN(num_layers=num_layers)
     
+    default_loss_weights = [1, 1, 1, 1]
     P_loss_weights = [1, 0, 0, 0]
     V_loss_weights = [0, 1, 0, 0]
     Q_loss_weights = [0, 0, 1, 0]
@@ -586,7 +646,7 @@ if __name__ == '__main__':
             batch_size=32,
             lr=lr,
             device='cpu',
-            loss_weights=Theta_loss_weights)
+            loss_weights=default_loss_weights)
         np.save(train_loss_history_filepath, train_loss_history)
         np.save(val_loss_history_filepath, val_loss_history)
     
