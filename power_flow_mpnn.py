@@ -594,7 +594,7 @@ if __name__ == '__main__':
     train_loss_history = np.load(train_loss_history_filepath)
     val_loss_history = np.load(val_loss_history_filepath)
     plot_loss_history(train_loss_history)
-    plot_loss_history(val_loss_history_filepath)
+    plot_loss_history(val_loss_history)
     
     mask = test_data['X'][:, :, 4:8].astype(bool)
     bases = test_data['bases']
