@@ -562,6 +562,28 @@ def plot_loss_history(loss_history):
     plt.grid(True)
     plt.show()
     
+def plot_nrmse_by_bus(bus_metrics):
+    
+    variables = ['P', 'V', 'Q', 'Theta']
+    
+    plt.figure()
+    
+    for variable in variables:
+        buses = [
+            bus for bus in bus_metrics
+            if variable in bus_metrics[bus]]
+        nrmse = [
+            bus_metrics[bus][variable]['nrmse']
+            for bus in buses]
+        plt.plot(buses, nrmse, marker='o', label=variable)
+    
+    plt.xlabel('Bus Index')
+    plt.ylabel('NRMSE')
+    plt.title('NRMSE by Bus')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    
 def plot_bus_metrics(bus_metrics):
     variables = ['P', 'V', 'Q', 'Theta']
     metrics = ['mse', 'rmse', 'nrmse', 'bias', 'R2']
@@ -589,7 +611,7 @@ if __name__ == '__main__':
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, 'data')
     
-    n_samples = 100
+    n_samples = 20000
     data_filename = f'case14_PowerFlowNet_{str(n_samples)}samples'
     
     train_data_filepath = os.path.join(data_dir, data_filename + '_train.npy')
@@ -678,6 +700,12 @@ if __name__ == '__main__':
     print('Absolute Slack-Bus Metrics:\n')
     print_metrics(bus_metrics_absolute[0])
     
-    plot_bus_metrics(bus_metrics_absolute)
+    # plot_bus_metrics(bus_metrics_absolute)
+    plot_nrmse_by_bus(bus_metrics_pu)
+    plot_nrmse_by_bus(bus_metrics_absolute)
+    
+    # < 1: model error is smalller than the natural variation.
+    # ~ 1: model is about as inaccurate as the variation itself. roughly comparable to predicting the mean.
+    # > 1: model error exceeds the natural variation.
     
     print('')
